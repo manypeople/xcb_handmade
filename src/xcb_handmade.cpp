@@ -1201,20 +1201,6 @@ int hhxcbOpenGLAttribs[] =
     GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
     0,
 };
-internal hhxcb_thread_startup
-hhxcbGetThreadStartupForGL(hhxcb_context *context, GLXContext shareContext)
-{
-    hhxcb_thread_startup Result = {};
-
-    Result.window = context->window;
-    Result.display = context->display;
-	if(context->glXCreateContextAttribsARB)
-	{
-        Result.OpenGLContext = context->glXCreateContextAttribsARB(context->display, context->FBConfig, shareContext, true, hhxcbOpenGLAttribs);
-    }
-
-    return Result;
-}
 
 internal GLXContext
 hhxcbInitOpenGL(hhxcb_context *context)
@@ -1466,11 +1452,6 @@ ThreadFunction(void* arg)
 
 	u32 TestThreadID = GetThreadID();
     Assert(TestThreadID == (u32)pthread_self());
-
-    if(Thread->OpenGLContext)
-	{
-		glXMakeCurrent(Thread->display, Thread->window, Thread->OpenGLContext);
-	}
 
 	for(;;)
 	{
@@ -1936,10 +1917,6 @@ main()
 	hhxcbMakeQueue(&HighPriorityQueue, &HighQueueSemaphoreHandle, ArrayCount(HighPriStartups), HighPriStartups);
 
     hhxcb_thread_startup LowPriStartups[4] = {};
-    LowPriStartups[0] = hhxcbGetThreadStartupForGL(&context, OpenGLContext);
-    LowPriStartups[1] = hhxcbGetThreadStartupForGL(&context, OpenGLContext);
-    LowPriStartups[2] = hhxcbGetThreadStartupForGL(&context, OpenGLContext);
-    LowPriStartups[3] = hhxcbGetThreadStartupForGL(&context, OpenGLContext);
 	sem_t LowQueueSemaphoreHandle = {};
 	platform_work_queue LowPriorityQueue = {};
 	hhxcbMakeQueue(&LowPriorityQueue, &LowQueueSemaphoreHandle, ArrayCount(LowPriStartups), LowPriStartups);
@@ -2003,6 +1980,19 @@ main()
 	m.PlatformAPI.DEBUGExecuteSystemCommand = debug_execute_system_command;
 	m.PlatformAPI.DEBUGGetProcessState = debug_get_process_state;
 #endif
+
+    u32 TextureOpCount = 1024;
+    platform_texture_op_queue *TextureOpQueue = &m.TextureOpQueue;
+    TextureOpQueue->FirstFree = (texture_op *)mmap
+        (0, sizeof(texture_op)*TextureOpCount, PROT_WRITE|PROT_READ,
+         MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
+    for(u32 TextureOpIndex = 0;
+        TextureOpIndex < (TextureOpCount - 1);
+        ++TextureOpIndex)
+    {
+        texture_op *Op = TextureOpQueue->FirstFree + TextureOpIndex;
+        Op->Next = TextureOpQueue->FirstFree + TextureOpIndex + 1;
+    }
 
     Platform = m.PlatformAPI;
 
@@ -2310,6 +2300,20 @@ main()
 
 		BEGIN_BLOCK("FrameDisplay");
 
+        BeginTicketMutex(&TextureOpQueue->Mutex);
+        texture_op *FirstTextureOp = TextureOpQueue->First;
+        TextureOpQueue->First = 0;
+        EndTicketMutex(&TextureOpQueue->Mutex);
+					
+        if(FirstTextureOp)
+        {
+            texture_op *LastTextureOp = OpenGLManageTextures(FirstTextureOp);
+            BeginTicketMutex(&TextureOpQueue->Mutex);
+            LastTextureOp->Next = TextureOpQueue->FirstFree;
+            TextureOpQueue->FirstFree = FirstTextureOp;
+            EndTicketMutex(&TextureOpQueue->Mutex);
+        }
+        
 		hhxcbDisplayBufferInWindow(&context, &buffer,
                                    &HighPriorityQueue, &RenderCommands,
                                    DrawRegion,

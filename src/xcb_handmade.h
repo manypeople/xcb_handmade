@@ -73,9 +73,6 @@ struct platform_work_queue
 
 struct hhxcb_thread_startup
 {
-    xcb_window_t window;
-	Display *display;
-    GLXContext OpenGLContext;
     platform_work_queue *Queue;
 };
 
