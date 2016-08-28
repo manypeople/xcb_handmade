@@ -406,32 +406,6 @@ hhxcbGetSecondsElapsed(timespec start, timespec end)
 	return result;
 }
 
-#if 0
-internal void
-HandleDebugCycleCounter(game_memory* m)
-{
-#if HANDMADE_INTERNAL
-	printf("DEBUG CYCLE COUNTS:\n");
-	
-	for(uint CounterIndex =0;
-		CounterIndex < ArrayCount(m->Counters);
-		++CounterIndex)
-	{
-		debug_cycle_counter* Counter = m->Counters + CounterIndex;
-		if(Counter->HitCount)
-		{
-			printf("  %d: %lucy %uh %lucy/h\n", CounterIndex,
-				   Counter->CycleCount, Counter->HitCount, 
-				   (uint64)(Counter->CycleCount / Counter->HitCount));
-			Counter->HitCount = 0;
-			Counter->CycleCount = 0;
-		}
-		fflush(stdout);
-	}
-#endif
-}
-#endif
-
 internal void
 hhxcb_get_binary_name(hhxcb_state *state)
 {
@@ -2302,12 +2276,14 @@ main()
 
         BeginTicketMutex(&TextureOpQueue->Mutex);
         texture_op *FirstTextureOp = TextureOpQueue->First;
-        TextureOpQueue->First = 0;
+        texture_op *LastTextureOp = TextureOpQueue->Last;
+        TextureOpQueue->Last = TextureOpQueue->First = 0;
         EndTicketMutex(&TextureOpQueue->Mutex);
 					
         if(FirstTextureOp)
         {
-            texture_op *LastTextureOp = OpenGLManageTextures(FirstTextureOp);
+            Assert(LastTextureOp);
+            OpenGLManageTextures(FirstTextureOp);
             BeginTicketMutex(&TextureOpQueue->Mutex);
             LastTextureOp->Next = TextureOpQueue->FirstFree;
             TextureOpQueue->FirstFree = FirstTextureOp;
