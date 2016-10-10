@@ -505,7 +505,15 @@ hhxcb_load_game(hhxcb_game_code *game_code, char *path)
 
     game_code->is_valid = game_code->library_handle &&
         game_code->UpdateAndRender && game_code->GetSoundSamples &&
-+                              game_code->DEBUGFrameEnd;
+        game_code->DEBUGFrameEnd;
+
+    if(!game_code->is_valid)
+    {
+        game_code->library_handle = 0;
+        game_code->UpdateAndRender = 0;
+        game_code->GetSoundSamples = 0;
+        game_code->DEBUGFrameEnd = 0;        
+    }
 }
 
 internal void
@@ -1796,7 +1804,7 @@ main()
     }
     
     hhxcb_load_game(&game_code, source_game_code_library_path);
-
+    
     DEBUGSetEventRecording(game_code.is_valid);
 
     hhxcb_context context = {};
