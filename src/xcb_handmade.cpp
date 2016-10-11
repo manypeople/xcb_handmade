@@ -1910,8 +1910,11 @@ main()
     sound_output.samples_per_second = 48000;
 	sound_output.channels = 2;
     sound_output.bytes_per_sample = sizeof(int16) * sound_output.channels;
-	// NOTE: one second buffer
-	sound_output.buffer_size_in_samples = sound_output.samples_per_second;
+	// NOTE: two second buffer
+    // NOTE: do not know why the game will crash with segmentation fault
+    // if this buffer is only large enough to store one second of sound
+    // samples, but only when compiled with optimization enabled
+	sound_output.buffer_size_in_samples = sound_output.samples_per_second * 2;
     sound_output.buffer_size_in_bytes = sound_output.buffer_size_in_samples * sound_output.bytes_per_sample;
 	sound_output.safety_samples = (uint32)(((real32)sound_output.samples_per_second / game_update_hz)/3.0f);
     hhxcb_init_alsa(&context, &sound_output);
@@ -1925,9 +1928,7 @@ main()
     u32 PushBufferSize = Megabytes(64);
     void *PushBuffer = hhxcbAllocateMemory(PushBufferSize);
 	
-	// TODO: remove maxpossibleoverrun
-	u32 MaxPossibleOverrun = 2*8*sizeof(u16);
-    int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes + MaxPossibleOverrun), 1);
+    int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
     game_memory m = {};
     m.PermanentStorageSize = Megabytes(256);
@@ -2132,6 +2133,8 @@ main()
             {
                 game_code.GetSoundSamples(&m, &sound_buffer);
             }
+            // NOTE: why don't the avail/delay values seem to work when
+            // compiler optimization is enabled?
 #define SOUND_DEBUG 0
 #if SOUND_DEBUG
             // NOTE: "delay" is the delay of the soundcard hardware
