@@ -1,0 +1,289 @@
+diff --git a/code/handmade_debug_interface.h b/code/handmade_debug_interface.h
+index 9b2b83f..9be8ddb 100644
+--- a/code/handmade_debug_interface.h
++++ b/code/handmade_debug_interface.h
+@@ -82,6 +82,9 @@ struct debug_event
+     };
+ };
+ 
++
++#define MAX_STRING_LENGTH 256
++#define NUM_OF_STRINGS 2048
+ struct debug_table
+ {
+     debug_event EditEvent;
+@@ -95,6 +98,13 @@ struct debug_table
+     // only need 1 bit to store which array we're using...
+     u64 volatile EventArrayIndex_EventIndex;
+     debug_event Events[2][16*65536];
++
++    // NOTE: need to store the concatenated strings, used in
++    // the TIMED_FUNCTION macro, so the debug collatation will be able to
++    // reference them at the end of the frame    
++    u32 maxStringSize = MAX_STRING_LENGTH;
++    u32 numOfStrings = NUM_OF_STRINGS;
++    char strings[NUM_OF_STRINGS][MAX_STRING_LENGTH];
+ };
+ 
+ extern debug_table *GlobalDebugTable;
+@@ -123,8 +133,94 @@ u64 ArrayIndex_EventIndex = AtomicAddU64(&GlobalDebugTable->EventArrayIndex_Even
+ #define TIMED_BLOCK__(GUID, Number, ...) timed_block TimedBlock_##Number(GUID, ## __VA_ARGS__)
+ #define TIMED_BLOCK_(GUID, Number, ...) TIMED_BLOCK__(GUID, Number, ## __VA_ARGS__)
+ #define TIMED_BLOCK(Name, ...) TIMED_BLOCK_(DEBUG_NAME(Name), __COUNTER__, ## __VA_ARGS__)
+-#define TIMED_FUNCTION(...) TIMED_BLOCK_(DEBUG_NAME(__FUNCTION__), ## __VA_ARGS__)
+ 
++// NOTE: brute force work around because gcc defines __FUNCTION__ as a
++// variable instead of just treating __FUNCTION__ as a macro style
++// string replace
++//inline
++void
++JoinStrings(char *String1, char *String2, char *Result)
++{    
++    char *R = Result;
++    char *C = 0;
++    for(C = String1; *C != 0; ++C)
++    {
++        *R = *C;
++        ++R;
++    }
++    for(C = String2; *C != 0; ++C)
++    {
++        *R = *C;
++        ++R;
++    }
++    *R = 0;
++}
++
++inline u32
++StringHash(char *string)
++{
++    u32 result = 0;
++    for(char *C = string; *C != 0; ++C)
++    {
++        result = 65599*result + *C;
++    }
++    return result;
++}
++
++//inline
++void
++CopyString(char *String, char *Result)
++{
++    JoinStrings(String, "", Result);
++}
++
++u32 StringLength(char *String);
++
++// NOTE: check to see if NUM_OF_STRINGS is large enough to have no
++// collisions
++#define TEST_FOR_COLLISIONS 0
++#if TEST_FOR_COLLISIONS
++#include "stdio.h"
++b32 StringsAreEqual(char *A, char *B);
++#endif
++
++internal char *
++StoreName(char *DebugName, char * FunctionName)
++{
++    u32 DebugNameLength = StringLength(DebugName);
++    u32 FunctionNameLength = StringLength(FunctionName);
++    u32 DebugFunctionNameLength = DebugNameLength + FunctionNameLength + 1;
++    char DebugFunctionName[DebugFunctionNameLength] = {};
++    JoinStrings(DebugName, FunctionName, DebugFunctionName);
++    u32 stringBucket = StringHash(DebugFunctionName) % GlobalDebugTable->numOfStrings;
++    char *selectedString = GlobalDebugTable->strings[stringBucket];
++#if TEST_FOR_COLLISIONS
++    char stringCopy[256] = {};
++    if(*selectedString)
++    {
++        CopyString(selectedString, stringCopy);
++    }
++    if(!StringsAreEqual(DebugFunctionName, stringCopy))
++    {
++        printf("mismatch: %s, %s\n", DebugFunctionName, stringCopy);
++    }
++#endif
++    // NOTE: if there is a hash collision, we just use the
++    // previously stored string. because it is probably too expensive
++    // to compare strings for each TIMED_FUNCTION call, maybe it isn't,
++    // I couldn't see much difference in the game, with and without
++    // string compares at every TIMED_FUNCTION call
++    if(*selectedString == 0)
++    {
++        Assert(DebugFunctionNameLength < GlobalDebugTable->maxStringSize);
++        CopyString(DebugFunctionName, selectedString);
++    }
++    return selectedString;
++}
++#define TIMED_FUNCTION(...) char *DebugName = DEBUG_NAME(""); \
++    char *storedName = StoreName(DebugName, (char *)__FUNCTION__);   \
++    TIMED_BLOCK_(storedName, __COUNTER__, ## __VA_ARGS__)
++    
+ #define BEGIN_BLOCK_(GUID) {RecordDebugEvent(DebugType_BeginBlock, GUID);}
+ #define END_BLOCK_(GUID) {RecordDebugEvent(DebugType_EndBlock, GUID);}
+ 
+@@ -231,9 +327,10 @@ internal void DEBUGEditEventData(char *GUID, debug_event *Event);
+      } 
+ #define DEBUG_NAMED_VALUE(Value)  \
+ { \
+-    RecordDebugEvent(DebugType_Unknown, __FUNCTION__ #Value);                              \
++    char *storedName = StoreName((char *)__FUNCTION__, #Value);   \
++    RecordDebugEvent(DebugType_Unknown, storedName); \
+     DEBUGValueSetEventData(Event, Value, (void *)&(Value)); \
+-} 
++}
+ 
+ #define DEBUG_B32(Value)  \
+ { \
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index 7394c29..ec7f534 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -341,8 +341,8 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                    GL_TEXTURE_2D, TextureHandle,
+                                    0);
+-            GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+-            Assert(Status == GL_FRAMEBUFFER_COMPLETE);
++            GLenum Status1 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++            Assert(Status1 == GL_FRAMEBUFFER_COMPLETE);
+         }
+         
+         GlobalFramebufferCount = NewFramebufferCount;
+@@ -359,7 +359,10 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+         
+         if(TargetIndex == 0)
+         {
+-            glScissor(0, 0, WindowWidth, WindowHeight); 
++            // NOTE: workaround x11/xcb wrong reported window dimensions
++#define START_HEIGHT 1080
++            glScissor(0, (START_HEIGHT - GlobalWindowHeight),
++                      WindowWidth, WindowHeight); 
+         }
+         else
+         {
+diff --git a/code/handmade_particles.cpp b/code/handmade_particles.cpp
+index 93d4a9a..23abba2 100644
+--- a/code/handmade_particles.cpp
++++ b/code/handmade_particles.cpp
+@@ -23,29 +23,86 @@ SpawnFire(particle_cache *Cache, v3 AtPInit)
+     }
+     
+     particle_4x *A = System->Particles + ParticleIndex4;
++
++    f32 Px = RandomBetween(Entropy, -0.05f, 0.05f);
++    A->P.x[0] = Px;
++    A->P.x[1] = Px;
++    A->P.x[2] = Px;
++    A->P.x[3] = Px;
++    A->P.y[0] = 0.0f;
++    A->P.y[1] = 0.0f;
++    A->P.y[2] = 0.0f;
++    A->P.y[3] = 0.0f;
++    A->P.z[0] = 0.0f;
++    A->P.z[1] = 0.0f;
++    A->P.z[2] = 0.0f;
++    A->P.z[3] = 0.0f;
++    A->P = A->P + AtP;
++
++    f32 dPx = RandomBetween(Entropy, -0.01f, 0.01f);
++    f32 dPy = RandomBetween(Entropy, 0.7f, 1.0f);
++    A->dP.x[0] = dPx;
++    A->dP.x[1] = dPx;
++    A->dP.x[2] = dPx;
++    A->dP.x[3] = dPx;
++    A->dP.y[0] = dPy;
++    A->dP.y[1] = dPy;
++    A->dP.y[2] = dPy;
++    A->dP.y[3] = dPy;
++    A->dP.z[0] = 0.0f;
++    A->dP.z[1] = 0.0f;
++    A->dP.z[2] = 0.0f;
++    A->dP.z[3] = 0.0f;
+     
+-    A->P.x = MMSetExpr(RandomBetween(Entropy, -0.05f, 0.05f));
+-    A->P.y = MMSetExpr(0.0f);
+-    A->P.z = MMSetExpr(0.0f);
+-    A->P += AtP;
+-    
+-    A->dP.x = MMSetExpr(RandomBetween(Entropy, -0.01f, 0.01f));
+-    A->dP.y = MMSetExpr(7.0f*RandomBetween(Entropy, 0.7f, 1.0f));
+-    A->dP.z = MMSetExpr(0.0f);
+-    
+-    A->ddP.x = MMSetExpr(0.0f);
+-    A->ddP.y = MMSetExpr(-9.8f);
+-    A->ddP.z = MMSetExpr(0.0f);
+-    
+-    A->C.r = MMSetExpr(RandomBetween(Entropy, 0.75f, 1.0f));
+-    A->C.g = MMSetExpr(RandomBetween(Entropy, 0.75f, 1.0f));
+-    A->C.b = MMSetExpr(RandomBetween(Entropy, 0.75f, 1.0f));
+-    A->C.a = MMSetExpr(1.0f);
++    A->ddP.x[0] = 0.0f;
++    A->ddP.x[1] = 0.0f;
++    A->ddP.x[2] = 0.0f;
++    A->ddP.x[3] = 0.0f;
++    A->ddP.y[0] = -9.8f;
++    A->ddP.y[1] = -9.8f;
++    A->ddP.y[2] = -9.8f;
++    A->ddP.y[3] = -9.8f;
++    A->ddP.z[0] = 0.0f;
++    A->ddP.z[1] = 0.0f;
++    A->ddP.z[2] = 0.0f;
++    A->ddP.z[3] = 0.0f;
+     
+-    A->dC.r = MMSetExpr(0.0f);
+-    A->dC.g = MMSetExpr(0.0f);
+-    A->dC.b = MMSetExpr(0.0f);
+-    A->dC.a = MMSetExpr(-1.0f);
++    f32 Cr = RandomBetween(Entropy, 0.75f, 1.0f);
++    f32 Cg = RandomBetween(Entropy, 0.75f, 1.0f);
++    f32 Cb = RandomBetween(Entropy, 0.75f, 1.0f);
++    A->C.r[0] = Cr;
++    A->C.r[1] = Cr;
++    A->C.r[2] = Cr;
++    A->C.r[3] = Cr;
++    A->C.g[0] = Cg;
++    A->C.g[1] = Cg;
++    A->C.g[2] = Cg;
++    A->C.g[3] = Cg;
++    A->C.b[0] = Cb;
++    A->C.b[1] = Cb;
++    A->C.b[2] = Cb;
++    A->C.b[3] = Cb;
++    A->C.a[0] = 1.0f;
++    A->C.a[1] = 1.0f;
++    A->C.a[2] = 1.0f;
++    A->C.a[3] = 1.0f;
++        
++    A->dC.r[0] = 0.0f;
++    A->dC.r[1] = 0.0f;
++    A->dC.r[2] = 0.0f;
++    A->dC.r[3] = 0.0f;
++    A->dC.g[0] = 0.0f;
++    A->dC.g[1] = 0.0f;
++    A->dC.g[2] = 0.0f;
++    A->dC.g[3] = 0.0f;
++    A->dC.b[0] = 0.0f;
++    A->dC.b[1] = 0.0f;
++    A->dC.b[2] = 0.0f;
++    A->dC.b[3] = 0.0f;
++    A->dC.a[0] = -1.0f;
++    A->dC.a[1] = -1.0f;
++    A->dC.a[2] = -1.0f;
++    A->dC.a[3] = -1.0f;
+ }
+ 
+ internal void
+@@ -137,9 +194,9 @@ UpdateAndRenderFire(particle_system *System, random_series *Entropy, f32 dt,
+ #endif
+         
+         // NOTE(casey): Simulate the particle forward in time
+-        A->P += 0.5f*Square(dt)*A->ddP + dt*A->dP + FrameDisplacement;
+-        A->dP += dt*A->ddP;
+-        A->C += dt*A->dC;
++        A->P = A->P + (0.5f*Square(dt)*A->ddP + dt*A->dP + FrameDisplacement);
++        A->dP = A->dP + (dt*A->ddP);
++        A->C = A->C + (dt*A->dC);
+         
+ #if 0
+         if(Particle->P.y < 0.0f)
