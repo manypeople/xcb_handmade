@@ -89,7 +89,8 @@
 #include "xcb_handmade.h"
 #include "handmade_shared.h"
 
-global_variable platform_api Platform;
+platform_api Platform;
+
 global_variable b32 OpenGLSupportsSRGBFramebuffer;
 global_variable GLuint OpenGLDefaultInternalTextureFormat;
 global_variable GLuint OpenGLReservedBlitTexture;
@@ -1933,15 +1934,11 @@ main()
     game_memory m = {};
     m.PermanentStorageSize = Megabytes(256);
     m.TransientStorageSize = Gigabytes(1);
-    m.DebugStorageSize = Megabytes(256);
-    state.total_size = m.PermanentStorageSize + m.TransientStorageSize +
-		m.DebugStorageSize;
+    state.total_size = m.PermanentStorageSize + m.TransientStorageSize;
     state.game_memory_block = calloc(state.total_size, sizeof(uint8));
     m.PermanentStorage = (uint8 *)state.game_memory_block;
     m.TransientStorage =
         (uint8_t *)m.PermanentStorage + m.PermanentStorageSize;
-	m.DebugStorage =
-        (u8 *)m.TransientStorage + m.TransientStorageSize;
 #if HANDMADE_INTERNAL
     m.DebugTable = GlobalDebugTable;
 #endif
