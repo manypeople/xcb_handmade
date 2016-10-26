@@ -558,13 +558,16 @@ hhxcb_start_recording(hhxcb_state *state, uint8 index)
             SourceBlock != Sentinel;
             SourceBlock = SourceBlock->Next)
         {
-            hhxcb_saved_memory_block DestBlock;
-            void *BasePointer = GetBasePointer(SourceBlock);
-            DestBlock.BasePointer = (u64)BasePointer;
-            DestBlock.Size = SourceBlock->Size;
-            write(state->recording_fd, &DestBlock, sizeof(DestBlock));
-            Assert(DestBlock.Size <= U32Maximum);
-            write(state->recording_fd, BasePointer, (u32)DestBlock.Size);
+            if(!(SourceBlock->Flags & PlatformMemory_NotRestored))
+            {
+                hhxcb_saved_memory_block DestBlock;
+                void *BasePointer = GetBasePointer(SourceBlock);
+                DestBlock.BasePointer = (u64)BasePointer;
+                DestBlock.Size = SourceBlock->Size;
+                write(state->recording_fd, &DestBlock, sizeof(DestBlock));
+                Assert(DestBlock.Size <= U32Maximum);
+                write(state->recording_fd, BasePointer, (u32)DestBlock.Size);
+            }
         }
 
         hhxcb_saved_memory_block DestBlock = {};
@@ -581,8 +584,43 @@ hhxcb_stop_recording(hhxcb_state *state)
 }
 
 internal void
+hhxcbFreeMemoryBlock(hhxcb_memory_block *Block)
+{
+    BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
+    Block->Prev->Next = Block->Next;
+    Block->Next->Prev = Block->Prev;
+    EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
+		
+    smm Result = munmap(Block, (Block->Size + sizeof(hhxcb_memory_block)));
+    Assert(Result != -1);
+}
+
+internal void
+hhxcbClearBlocksByMask(hhxcb_state *State, u64 Mask)
+{
+    for(hhxcb_memory_block *BlockIter = State->MemorySentinel.Next;
+        BlockIter != &State->MemorySentinel;
+        )
+    {
+        hhxcb_memory_block *Block = BlockIter;
+        BlockIter = BlockIter->Next;
+        
+        if((Block->LoopingFlags & Mask) == Mask)
+        {
+            hhxcbFreeMemoryBlock(Block);
+        }
+        else
+        {
+            Block->LoopingFlags = 0;
+        }
+    }
+}
+
+internal void
 hhxcb_start_playback(hhxcb_state *state, uint8 index)
 {
+    hhxcbClearBlocksByMask(state, hhxcbMem_AllocatedDuringLooping);
+
     char filename[HHXCB_STATE_FILE_NAME_LENGTH];
     hhxcb_get_input_file_location(state, true, index, sizeof(filename), filename);
     state->playback_fd = open(filename, O_RDONLY);
@@ -614,6 +652,7 @@ hhxcb_start_playback(hhxcb_state *state, uint8 index)
 internal void
 hhxcb_stop_playback(hhxcb_state *state)
 {
+    hhxcbClearBlocksByMask(state, hhxcbMem_FreedDuringLooping);
     close(state->playback_fd);
     state->playback_index = 0;
     state->playback_fd = 0;
@@ -1734,6 +1773,14 @@ internal PLATFORM_CLOSE_FILE(hhxcbCloseFile)
 }
  */
 
+inline b32x
+hhxcbIsInLoop(hhxcb_state *state)
+{
+	b32x Result = ((state->recording_index != 0) ||
+				   (state->playback_index));
+	return(Result);
+}
+
 PLATFORM_ALLOCATE_MEMORY(hhxcbAllocateMemory)
 {
     // NOTE(casey): We require memory block headers not to change the cache
@@ -1748,6 +1795,8 @@ PLATFORM_ALLOCATE_MEMORY(hhxcbAllocateMemory)
 	hhxcb_memory_block *Sentinel = &GlobalHhxcbState.MemorySentinel;
 	Block->Next = Sentinel;
 	Block->Size = Size;
+    Block->Flags = Flags;
+    Block->LoopingFlags = hhxcbIsInLoop(&GlobalHhxcbState) ? hhxcbMem_AllocatedDuringLooping : 0;
 	
 	BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
 	Block->Prev = Sentinel->Prev;
@@ -1766,13 +1815,14 @@ PLATFORM_DEALLOCATE_MEMORY(hhxcbDeallocateMemory)
     {
         hhxcb_memory_block *Block = ((hhxcb_memory_block *)Memory - 1);
 		
-		BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
-		Block->Prev->Next = Block->Next;
-		Block->Next->Prev = Block->Prev;
-		EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
-		
-		smm Result = munmap(Block, (Block->Size + sizeof(hhxcb_memory_block)));
-		Assert(Result != -1);
+        if(hhxcbIsInLoop(&GlobalHhxcbState))
+		{
+			Block->LoopingFlags = hhxcbMem_FreedDuringLooping;
+		}
+		else
+		{
+			hhxcbFreeMemoryBlock(Block);
+		}
     }
 }
 
@@ -1938,7 +1988,7 @@ main()
     
     // TODO(casey): Decide what our pushbuffer size is!
     u32 PushBufferSize = Megabytes(64);
-    void *PushBuffer = hhxcbAllocateMemory(PushBufferSize);
+    void *PushBuffer = hhxcbAllocateMemory(PushBufferSize, PlatformMemory_NotRestored);
 	
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 

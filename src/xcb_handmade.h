@@ -29,12 +29,20 @@
 #define HHXCB_CLOCK CLOCK_MONOTONIC
 #define HHXCB_MAX_CONTROLLERS 4
 
+enum hhxcb_memory_block_flag
+{
+	hhxcbMem_AllocatedDuringLooping = 0x1,
+	hhxcbMem_FreedDuringLooping = 0x2,
+};
+
 struct hhxcb_memory_block
 {
     hhxcb_memory_block *Prev;
     hhxcb_memory_block *Next;
     u64 Size;
-    u64 Pad[5];
+    u64 Flags;
+	u64 LoopingFlags;
+	u64 Pad[3];
 };
 
 inline void *GetBasePointer(hhxcb_memory_block *Block)
