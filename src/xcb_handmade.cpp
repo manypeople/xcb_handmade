@@ -95,6 +95,7 @@ global_variable b32 OpenGLSupportsSRGBFramebuffer;
 global_variable GLuint OpenGLDefaultInternalTextureFormat;
 global_variable GLuint OpenGLReservedBlitTexture;
 
+global_variable hhxcb_state GlobalHhxcbState;
 global_variable b32 GlobalSoftwareRendering;
 global_variable u32 GlobalWindowWidth;
 global_variable u32 GlobalWindowHeight;
@@ -541,59 +542,33 @@ hhxcb_get_input_file_location(hhxcb_state *state, bool32 input_stream, uint inde
             dest);
 }
 
-internal hhxcb_replay_buffer *
-hhxcb_get_replay_buffer(hhxcb_state *state, uint8 index)
-{
-    Assert(index < ArrayCount(state->replay_buffers));
-    hhxcb_replay_buffer *result = &state->replay_buffers[index];
-    return result;
-}
-
-internal void
-hhxcb_init_replays(hhxcb_state *state)
-{
-    for (uint8 index = 0;
-            index < ArrayCount(state->replay_buffers);
-            ++index)
-    {
-        hhxcb_replay_buffer *replay_buffer = &state->replay_buffers[index];
-
-        hhxcb_get_input_file_location(state, false, index,
-                sizeof(replay_buffer->filename), replay_buffer->filename);
-
-        replay_buffer->file_handle = open(replay_buffer->filename,
-                O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-        int truncate_succeeded = ftruncate(replay_buffer->file_handle, state->total_size);
-        if (truncate_succeeded == -1)
-        {
-            perror("ftruncate");
-        }
-        // NOTE: using MAP_POPULATE makes process use > 2GB of memory,
-        // even when not using replays
-        replay_buffer->memory_block = mmap(0, state->total_size,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE, // | MAP_POPULATE,
-                replay_buffer->file_handle, 0);
-
-        if (replay_buffer->memory_block == MAP_FAILED)
-        {
-            perror("mmap");
-        }
-    }
-}
-
 internal void
 hhxcb_start_recording(hhxcb_state *state, uint8 index)
 {
-    hhxcb_replay_buffer *replay_buffer = hhxcb_get_replay_buffer(state, index);
-    if (replay_buffer->memory_block)
+    char filename[HHXCB_STATE_FILE_NAME_LENGTH];
+    hhxcb_get_input_file_location(state, true, index, sizeof(filename), filename);
+    state->recording_fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+
+    if(state->recording_fd != -1)
     {
         state->recording_index = index;
-        char filename[HHXCB_STATE_FILE_NAME_LENGTH];
-        hhxcb_get_input_file_location(state, true, index, sizeof(filename), filename);
-        state->recording_fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    
+        hhxcb_memory_block *Sentinel = &GlobalHhxcbState.MemorySentinel;
+        for(hhxcb_memory_block *SourceBlock = Sentinel->Next;
+            SourceBlock != Sentinel;
+            SourceBlock = SourceBlock->Next)
+        {
+            hhxcb_saved_memory_block DestBlock;
+            void *BasePointer = GetBasePointer(SourceBlock);
+            DestBlock.BasePointer = (u64)BasePointer;
+            DestBlock.Size = SourceBlock->Size;
+            write(state->recording_fd, &DestBlock, sizeof(DestBlock));
+            Assert(DestBlock.Size <= U32Maximum);
+            write(state->recording_fd, BasePointer, (u32)DestBlock.Size);
+        }
 
-        memcpy(replay_buffer->memory_block, state->game_memory_block, state->total_size);
+        hhxcb_saved_memory_block DestBlock = {};
+        write(state->recording_fd, &DestBlock, sizeof(DestBlock));
     }
 }
 
@@ -608,14 +583,31 @@ hhxcb_stop_recording(hhxcb_state *state)
 internal void
 hhxcb_start_playback(hhxcb_state *state, uint8 index)
 {
-    hhxcb_replay_buffer *replay_buffer = hhxcb_get_replay_buffer(state, index);
-    if (replay_buffer->memory_block)
+    char filename[HHXCB_STATE_FILE_NAME_LENGTH];
+    hhxcb_get_input_file_location(state, true, index, sizeof(filename), filename);
+    state->playback_fd = open(filename, O_RDONLY);
+
+    if(state->playback_fd != -1)
     {
         state->playback_index = index;
-        char filename[HHXCB_STATE_FILE_NAME_LENGTH];
-        hhxcb_get_input_file_location(state, true, index, sizeof(filename), filename);
-        state->playback_fd = open(filename, O_RDONLY);
-        memcpy(state->game_memory_block, replay_buffer->memory_block, state->total_size);
+
+        for(;;)
+        {
+            hhxcb_saved_memory_block Block = {};
+
+            read(state->playback_fd, &Block, sizeof(Block));
+            if(Block.BasePointer != 0)
+            {
+                void *BasePointer = (void *)Block.BasePointer;
+                Assert(Block.Size <= U32Maximum);
+                read(state->playback_fd, BasePointer, (u32)Block.Size);
+            }
+            else
+            {
+                break;
+            }
+        }
+        // TODO(casey): Stream memory in from the file!
     }
 }
 
@@ -1744,25 +1736,43 @@ internal PLATFORM_CLOSE_FILE(hhxcbCloseFile)
 
 PLATFORM_ALLOCATE_MEMORY(hhxcbAllocateMemory)
 {
-	// NOTE: allocate (Size + sizeof(u64)) to store size to be used
-	// by munmap
-    void *Result = mmap(0, (Size + sizeof(u64)), PROT_READ | PROT_WRITE,
+    // NOTE(casey): We require memory block headers not to change the cache
+	// line alignment of an allocation
+	Assert(sizeof(hhxcb_memory_block) == 64);
+	
+	hhxcb_memory_block *Block = (hhxcb_memory_block *)
+        mmap(0, (Size + sizeof(hhxcb_memory_block)), PROT_READ | PROT_WRITE,
 			MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	// NOTE: put size at start of memory
-	*(u64 *)Result = (u64)(Size + sizeof(u64));
+    Assert(Block);
+	
+	hhxcb_memory_block *Sentinel = &GlobalHhxcbState.MemorySentinel;
+	Block->Next = Sentinel;
+	Block->Size = Size;
+	
+	BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
+	Block->Prev = Sentinel->Prev;
+	Block->Prev->Next = Block;
+	Block->Next->Prev = Block;
+	EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
+	
+	void *Result = GetBasePointer(Block);
 
-	// NOTE: return only the memory after where the size is stored
-    return(((u64 *)Result + 1));
+    return(Result);
 }
 
 PLATFORM_DEALLOCATE_MEMORY(hhxcbDeallocateMemory)
 {
     if(Memory)
     {
-		// NOTE: unlike virtualfree munmap seems to need the size to free
-		u64 *RealStartOfMemory = ((u64 *)Memory - 1);
-		u64 Size = *RealStartOfMemory;
-        munmap(RealStartOfMemory, Size);
+        hhxcb_memory_block *Block = ((hhxcb_memory_block *)Memory - 1);
+		
+		BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
+		Block->Prev->Next = Block->Next;
+		Block->Next->Prev = Block->Prev;
+		EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
+		
+		smm Result = munmap(Block, (Block->Size + sizeof(hhxcb_memory_block)));
+		Assert(Result != -1);
     }
 }
 
@@ -1776,18 +1786,21 @@ main()
 {
     DEBUGSetEventRecording(true);
 
-    hhxcb_state state = {};
-    hhxcb_get_binary_name(&state);
+    hhxcb_state *state = &GlobalHhxcbState;
+    state->MemorySentinel.Prev = &state->MemorySentinel;
+    state->MemorySentinel.Next = &state->MemorySentinel;
+    
+    hhxcb_get_binary_name(state);
     
     char mainExecutablePath[HHXCB_STATE_FILE_NAME_LENGTH];
     char *mainExecutableFilename = (char *)"xcb_handmade";
-    hhxcb_build_full_filename(&state, mainExecutableFilename,
+    hhxcb_build_full_filename(state, mainExecutableFilename,
             sizeof(mainExecutablePath),
             mainExecutablePath);
     
     char source_game_code_library_path[HHXCB_STATE_FILE_NAME_LENGTH];
     char *game_code_filename = (char *)"libhandmade.so";
-    hhxcb_build_full_filename(&state, game_code_filename,
+    hhxcb_build_full_filename(state, game_code_filename,
             sizeof(source_game_code_library_path),
             source_game_code_library_path);
 
@@ -1930,8 +1943,7 @@ main()
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
     game_memory m = {};
-    state.total_size = 0;
-    state.game_memory_block = 0;
+
 #if HANDMADE_INTERNAL
     m.DebugTable = GlobalDebugTable;
 #endif
@@ -1971,8 +1983,6 @@ main()
     }
 
     Platform = m.PlatformAPI;
-
-    hhxcb_init_replays(&state);
 
     timespec last_counter = hhxcbGetWallClock();
 
@@ -2036,7 +2046,7 @@ main()
             next_controller_refresh = last_counter.tv_sec + 1;
         }
 
-        hhxcb_process_events(&context, &state, &buffer, &RenderCommands,
+        hhxcb_process_events(&context, state, &buffer, &RenderCommands,
                              &DrawRegion, new_input, old_input);
 
 		END_BLOCK();
@@ -2049,14 +2059,14 @@ main()
 
         if(!GlobalPause)
         {
-            if (state.recording_index)
+            if (state->recording_index)
             {
-                hhxcb_record_input(&state, new_input);
+                hhxcb_record_input(state, new_input);
             }
-            if (state.playback_index)
+            if (state->playback_index)
             {
                 game_input temp = *new_input;
-                hhxcb_playback_input(&state, new_input);
+                hhxcb_playback_input(state, new_input);
                 for(u32 MouseButtonIndex = 0;
                     MouseButtonIndex < PlatformMouseButton_Count;
                     ++MouseButtonIndex)

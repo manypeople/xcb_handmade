@@ -28,21 +28,34 @@
 #define HHXCB_STATE_FILE_NAME_LENGTH (1024)
 #define HHXCB_CLOCK CLOCK_MONOTONIC
 #define HHXCB_MAX_CONTROLLERS 4
-#define HHXCB_NUM_REPLAYS 4
 
-struct hhxcb_replay_buffer
+struct hhxcb_memory_block
 {
-    uint32 file_handle;
-    uint32 memory_map;
-    char filename[HHXCB_STATE_FILE_NAME_LENGTH];
-    void *memory_block;
+    hhxcb_memory_block *Prev;
+    hhxcb_memory_block *Next;
+    u64 Size;
+    u64 Pad[5];
 };
 
-struct hhxcb_state {
-    uint64_t total_size;
-    void *game_memory_block;
-    hhxcb_replay_buffer replay_buffers[HHXCB_NUM_REPLAYS];
+inline void *GetBasePointer(hhxcb_memory_block *Block)
+{
+	void *Result = Block + 1;
+	return(Result);
+}
 
+struct hhxcb_saved_memory_block
+{
+	u64 BasePointer;
+	u64 Size;
+};
+
+struct hhxcb_state
+{
+    // NOTE(casey): To touch the memory ring, you must
+    // take the memory mutex!
+    ticket_mutex MemoryMutex;
+    hhxcb_memory_block MemorySentinel;
+    
     uint32_t recording_fd;
     uint32_t recording_index;
 
