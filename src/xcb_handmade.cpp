@@ -1921,9 +1921,7 @@ main()
     hhxcb_init_alsa(&context, &sound_output);
 
     // TODO(casey): Let's make this our first growable arena!
-    memory_arena FrameTempArena;
-    memory_index FrameTempArenaSize = Megabytes(64);
-    InitializeArena(&FrameTempArena, FrameTempArenaSize, hhxcbAllocateMemory(FrameTempArenaSize));
+    memory_arena FrameTempArena = {};
     
     // TODO(casey): Decide what our pushbuffer size is!
     u32 PushBufferSize = Megabytes(64);
@@ -1932,13 +1930,8 @@ main()
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
     game_memory m = {};
-    m.PermanentStorageSize = Megabytes(256);
-    m.TransientStorageSize = Gigabytes(1);
-    state.total_size = m.PermanentStorageSize + m.TransientStorageSize;
-    state.game_memory_block = calloc(state.total_size, sizeof(uint8));
-    m.PermanentStorage = (uint8 *)state.game_memory_block;
-    m.TransientStorage =
-        (uint8_t *)m.PermanentStorage + m.PermanentStorageSize;
+    state.total_size = 0;
+    state.game_memory_block = 0;
 #if HANDMADE_INTERNAL
     m.DebugTable = GlobalDebugTable;
 #endif
