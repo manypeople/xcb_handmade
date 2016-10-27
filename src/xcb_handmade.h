@@ -42,14 +42,9 @@ struct hhxcb_memory_block
     u64 Size;
     u64 Flags;
 	u64 LoopingFlags;
-	u64 Pad[3];
+    void *Base;
+    u64 Pad[2];
 };
-
-inline void *GetBasePointer(hhxcb_memory_block *Block)
-{
-	void *Result = Block + 1;
-	return(Result);
-}
 
 struct hhxcb_saved_memory_block
 {
