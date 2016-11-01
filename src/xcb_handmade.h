@@ -37,13 +37,10 @@ enum hhxcb_memory_block_flag
 
 struct hhxcb_memory_block
 {
+    platform_memory_block Block;
     hhxcb_memory_block *Prev;
     hhxcb_memory_block *Next;
-    u64 Size;
-    u64 Flags;
 	u64 LoopingFlags;
-    void *Base;
-    u64 Pad[2];
 };
 
 struct hhxcb_saved_memory_block

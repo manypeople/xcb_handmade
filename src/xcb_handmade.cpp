@@ -558,12 +558,12 @@ hhxcb_start_recording(hhxcb_state *state, uint8 index)
             SourceBlock != Sentinel;
             SourceBlock = SourceBlock->Next)
         {
-            if(!(SourceBlock->Flags & PlatformMemory_NotRestored))
+            if(!(SourceBlock->Block.Flags & PlatformMemory_NotRestored))
             {
                 hhxcb_saved_memory_block DestBlock;
-                void *BasePointer = SourceBlock->Base;
+                void *BasePointer = SourceBlock->Block.Base;
                 DestBlock.BasePointer = (u64)BasePointer;
-                DestBlock.Size = SourceBlock->Size;
+                DestBlock.Size = SourceBlock->Block.Size;
                 write(state->recording_fd, &DestBlock, sizeof(DestBlock));
                 Assert(DestBlock.Size <= U32Maximum);
                 write(state->recording_fd, BasePointer, (u32)DestBlock.Size);
@@ -591,7 +591,7 @@ hhxcbFreeMemoryBlock(hhxcb_memory_block *Block)
     Block->Next->Prev = Block->Prev;
     EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
 		
-    smm Result = munmap(Block, (Block->Size + sizeof(hhxcb_memory_block)));
+    smm Result = munmap(Block, (Block->Block.Size + sizeof(hhxcb_memory_block)));
     Assert(Result != -1);
 }
 
@@ -1781,37 +1781,48 @@ hhxcbIsInLoop(hhxcb_state *state)
 	return(Result);
 }
 
-global_variable umm GlobalHhxcbPageSize = 4096; // TODO(casey): You can get this from the OS, too!
 PLATFORM_ALLOCATE_MEMORY(hhxcbAllocateMemory)
 {
     // NOTE(casey): We require memory block headers not to change the cache
 	// line alignment of an allocation
 	Assert(sizeof(hhxcb_memory_block) == 64);
 
-    umm PageSize = GlobalHhxcbPageSize;
+    umm PageSize = 4096; // TODO(casey): Query from system?
 	umm TotalSize = Size + sizeof(hhxcb_memory_block);
-	if(Flags & PlatformMemory_UnderflowCheck)
+    umm BaseOffset = sizeof(hhxcb_memory_block);
+    umm ProtectOffset = 0;
+    if(Flags & PlatformMemory_UnderflowCheck)
 	{
-		TotalSize += 2*PageSize;
+        TotalSize = Size + 2*PageSize;
+		BaseOffset = 2*PageSize;
+		ProtectOffset = PageSize;
+	}
+	if(Flags & PlatformMemory_OverflowCheck)
+	{
+		umm SizeRoundedUp = AlignPow2(Size, PageSize);
+		TotalSize = SizeRoundedUp + 2*PageSize;
+		BaseOffset = PageSize + SizeRoundedUp - Size;
+		ProtectOffset = PageSize + SizeRoundedUp;
 	}
 	
 	hhxcb_memory_block *Block = (hhxcb_memory_block *)
         mmap(0, TotalSize, PROT_READ | PROT_WRITE,
 			MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     Assert(Block);
-    Block->Base = Block + 1;	
+    Block->Block.Base = (u8 *)Block + BaseOffset;
+    Assert(Block->Block.Used == 0);
+    Assert(Block->Block.ArenaPrev == 0);
 
-    if(Flags & PlatformMemory_UnderflowCheck)
+    if(Flags & (PlatformMemory_UnderflowCheck|PlatformMemory_OverflowCheck))
     {
-        smm Protected = mprotect((u8 *)Block + PageSize, PageSize, PROT_NONE);
+        smm Protected = mprotect((u8 *)Block + ProtectOffset, PageSize, PROT_NONE);
         Assert(Protected != -1);
-        Block->Base = (u8 *)Block + 2*PageSize;
     }
 	
 	hhxcb_memory_block *Sentinel = &GlobalHhxcbState.MemorySentinel;
 	Block->Next = Sentinel;
-	Block->Size = Size;
-    Block->Flags = Flags;
+	Block->Block.Size = Size;
+    Block->Block.Flags = Flags;
     Block->LoopingFlags = hhxcbIsInLoop(&GlobalHhxcbState) ? hhxcbMem_AllocatedDuringLooping : 0;
 	
 	BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
@@ -1819,30 +1830,23 @@ PLATFORM_ALLOCATE_MEMORY(hhxcbAllocateMemory)
 	Block->Prev->Next = Block;
 	Block->Next->Prev = Block;
 	EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
-	
-	void *Result = Block->Base;
-    return(Result);
+
+    platform_memory_block *PlatBlock = &Block->Block;
+    return(PlatBlock);
 }
 
 PLATFORM_DEALLOCATE_MEMORY(hhxcbDeallocateMemory)
 {
-    if(Memory)
+    if(Block)
     {
-        umm PageSize = GlobalHhxcbPageSize;
-        
-        hhxcb_memory_block *Block = ((hhxcb_memory_block *)Memory - 1);
-        if(Flags & PlatformMemory_UnderflowCheck)
-		{
-			Block = (hhxcb_memory_block *)((u8 *)Memory - 2*PageSize);
-		}
-        
+        hhxcb_memory_block *hhxcbBlock = ((hhxcb_memory_block *)Block);
         if(hhxcbIsInLoop(&GlobalHhxcbState))
 		{
-			Block->LoopingFlags = hhxcbMem_FreedDuringLooping;
+			hhxcbBlock->LoopingFlags = hhxcbMem_FreedDuringLooping;
 		}
 		else
 		{
-			hhxcbFreeMemoryBlock(Block);
+			hhxcbFreeMemoryBlock(hhxcbBlock);
 		}
     }
 }
