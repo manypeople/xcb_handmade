@@ -542,6 +542,48 @@ hhxcb_get_input_file_location(hhxcb_state *state, bool32 input_stream, uint inde
             dest);
 }
 
+internal
+DEBUG_PLATFORM_GET_MEMORY_STATS(hhxcbGetMemoryStats)
+{
+    debug_platform_memory_stats Stats = {};
+    
+    BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
+    hhxcb_memory_block *Sentinel = &GlobalHhxcbState.MemorySentinel;
+    for(hhxcb_memory_block *SourceBlock = Sentinel->Next;
+        SourceBlock != Sentinel;
+        SourceBlock = SourceBlock->Next)
+    {
+        Assert(SourceBlock->Block.Size <= U32Maximum);
+        
+        ++Stats.BlockCount;
+        Stats.TotalSize += SourceBlock->Block.Size;
+        Stats.TotalUsed += SourceBlock->Block.Used;
+    }
+    EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
+    
+    return(Stats);
+}
+
+internal void
+hhxcbVerifyMemoryListIntegrity(void)
+{
+    BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
+    local_persist u32 FailCounter;
+    hhxcb_memory_block *Sentinel = &GlobalHhxcbState.MemorySentinel;
+    for(hhxcb_memory_block *SourceBlock = Sentinel->Next;
+        SourceBlock != Sentinel;
+        SourceBlock = SourceBlock->Next)
+    {
+        Assert(SourceBlock->Block.Size <= U32Maximum);
+    }
+    ++FailCounter;
+    if(FailCounter == 35)
+    {
+        int BreakHere = 3;
+    }
+    EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
+}
+
 internal void
 hhxcb_start_recording(hhxcb_state *state, uint8 index)
 {
@@ -554,6 +596,8 @@ hhxcb_start_recording(hhxcb_state *state, uint8 index)
         state->recording_index = index;
     
         hhxcb_memory_block *Sentinel = &GlobalHhxcbState.MemorySentinel;
+
+        BeginTicketMutex(&GlobalHhxcbState.MemoryMutex);
         for(hhxcb_memory_block *SourceBlock = Sentinel->Next;
             SourceBlock != Sentinel;
             SourceBlock = SourceBlock->Next)
@@ -569,6 +613,7 @@ hhxcb_start_recording(hhxcb_state *state, uint8 index)
                 write(state->recording_fd, BasePointer, (u32)DestBlock.Size);
             }
         }
+        EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
 
         hhxcb_saved_memory_block DestBlock = {};
         write(state->recording_fd, &DestBlock, sizeof(DestBlock));
@@ -1797,7 +1842,7 @@ PLATFORM_ALLOCATE_MEMORY(hhxcbAllocateMemory)
 		BaseOffset = 2*PageSize;
 		ProtectOffset = PageSize;
 	}
-	if(Flags & PlatformMemory_OverflowCheck)
+	else if(Flags & PlatformMemory_OverflowCheck)
 	{
 		umm SizeRoundedUp = AlignPow2(Size, PageSize);
 		TotalSize = SizeRoundedUp + 2*PageSize;
@@ -2013,7 +2058,8 @@ main()
     
     // TODO(casey): Decide what our pushbuffer size is!
     u32 PushBufferSize = Megabytes(64);
-    void *PushBuffer = hhxcbAllocateMemory(PushBufferSize, PlatformMemory_NotRestored);
+    platform_memory_block *PushBufferBlock = hhxcbAllocateMemory(PushBufferSize, PlatformMemory_NotRestored);
+    u8 *PushBuffer = PushBufferBlock->Base;
 	
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
@@ -2042,6 +2088,7 @@ main()
     m.PlatformAPI.DEBUGWriteEntireFile = debug_xcb_write_entire_file;
 	m.PlatformAPI.DEBUGExecuteSystemCommand = debug_execute_system_command;
 	m.PlatformAPI.DEBUGGetProcessState = debug_get_process_state;
+    m.PlatformAPI.DEBUGGetMemoryStats = hhxcbGetMemoryStats;
 #endif
 
     u32 TextureOpCount = 1024;
