@@ -133,6 +133,27 @@ To run IACA:
 after switching on IACA in handmade_render_group.cpp and compiling.
 
 
+Underflow/Overfow checking
+--------------------------
+
+By default the linux kernel only has enough resources allocated to store
+65536 memory map areas (used for each mmap/mprotect call) at any one
+time. If the PlatformMemory_UnderflowCheck or PlatformMemory_OverflowCheck
+flag is enabled in the game, more space is needed for the large number of
+individual mmaps and mprotects (almost a million of each as of day 347).
+
+To increase the limit temporally, run:
+
+   sudo sysctl -w vm.max_map_count=2097152
+
+or to make is persistent, add vm.max_map_count=2097152 to /etc/sysctl.conf.
+
+If the game still crashes, you may need to increase the value.
+
+See https://www.kernel.org/doc/Documentation/sysctl/vm.txt max_map_count
+section for more information.
+
+
 Implementation progress
 -----------------------
 

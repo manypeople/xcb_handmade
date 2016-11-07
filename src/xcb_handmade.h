@@ -40,7 +40,8 @@ struct hhxcb_memory_block
     platform_memory_block Block;
     hhxcb_memory_block *Prev;
     hhxcb_memory_block *Next;
-	u64 LoopingFlags;
+	u32 LoopingFlags;
+    u32 AdditionalSize;
 };
 
 struct hhxcb_saved_memory_block

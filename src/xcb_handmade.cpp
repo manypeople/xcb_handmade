@@ -636,7 +636,7 @@ hhxcbFreeMemoryBlock(hhxcb_memory_block *Block)
     Block->Next->Prev = Block->Prev;
     EndTicketMutex(&GlobalHhxcbState.MemoryMutex);
 		
-    smm Result = munmap(Block, (Block->Block.Size + sizeof(hhxcb_memory_block)));
+    smm Result = munmap(Block, Block->Block.Size + Block->AdditionalSize);
     Assert(Result != -1);
 }
 
@@ -1855,6 +1855,7 @@ PLATFORM_ALLOCATE_MEMORY(hhxcbAllocateMemory)
 			MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     Assert(Block);
     Block->Block.Base = (u8 *)Block + BaseOffset;
+    Block->AdditionalSize = TotalSize - Size;
     Assert(Block->Block.Used == 0);
     Assert(Block->Block.ArenaPrev == 0);
 
