@@ -542,6 +542,7 @@ hhxcb_get_input_file_location(hhxcb_state *state, bool32 input_stream, uint inde
             dest);
 }
 
+#if HANDMADE_INTERNAL
 internal
 DEBUG_PLATFORM_GET_MEMORY_STATS(hhxcbGetMemoryStats)
 {
@@ -563,6 +564,7 @@ DEBUG_PLATFORM_GET_MEMORY_STATS(hhxcbGetMemoryStats)
     
     return(Stats);
 }
+#endif
 
 internal void
 hhxcbVerifyMemoryListIntegrity(void)
@@ -1495,7 +1497,6 @@ hhxcbDoNextWorkQueueEntry(platform_work_queue* Queue)
 internal void
 hhxcbCompleteAllWork(platform_work_queue* Queue)
 {
-	platform_work_queue_entry Entry = {};
     while(Queue->CompletionGoal != Queue->CompletionCount)
 	{
 		hhxcbDoNextWorkQueueEntry(Queue);
@@ -2031,12 +2032,12 @@ main()
 	GLXContext OpenGLContext = 0;
     OpenGLContext = hhxcbInitOpenGL(&context);
 
-    hhxcb_thread_startup HighPriStartups[10] = {};
+    hhxcb_thread_startup HighPriStartups[6] = {};
 	sem_t HighQueueSemaphoreHandle = {};
 	platform_work_queue HighPriorityQueue = {};
 	hhxcbMakeQueue(&HighPriorityQueue, &HighQueueSemaphoreHandle, ArrayCount(HighPriStartups), HighPriStartups);
 
-    hhxcb_thread_startup LowPriStartups[4] = {};
+    hhxcb_thread_startup LowPriStartups[2] = {};
 	sem_t LowQueueSemaphoreHandle = {};
 	platform_work_queue LowPriorityQueue = {};
 	hhxcbMakeQueue(&LowPriorityQueue, &LowQueueSemaphoreHandle, ArrayCount(LowPriStartups), LowPriStartups);
@@ -2233,7 +2234,7 @@ main()
             if(sound_output.buffer_size_in_samples == avail)
             {
                 // NOTE: initial fill on startup and after an underrun
-                samplesToFill = (expectedSamplesPerFrame*2) + sound_output.safety_samples;
+                samplesToFill = (expectedSamplesPerFrame*4) + sound_output.safety_samples;
             }
             else
             {
