@@ -5,6 +5,7 @@
 /src/stb_truetype.h
 /src/test_asset_builder.*
 /src/simple_preprocessor.*
+/src/simple_compressor.*
 /src/xcb_handmade.config
 /src/xcb_handmade.creator
 /src/xcb_handmade.creator.user
