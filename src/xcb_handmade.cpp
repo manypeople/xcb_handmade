@@ -1107,14 +1107,15 @@ hhxcb_refresh_controllers(hhxcb_context *context)
     }
 
     DIR *dir = opendir("/dev/input");
-    dirent entry;
-    dirent *result;
-    while (!readdir_r(dir, &entry, &result) && result)
+    dirent *entry;
+    for(entry = readdir(dir);
+        entry != 0;
+        entry = readdir(dir))
     {
-        if ((entry.d_name[0] == 'j') && (entry.d_name[1] == 's'))
+        if ((entry->d_name[0] == 'j') && (entry->d_name[1] == 's'))
         {
             char full_device_path[HHXCB_STATE_FILE_NAME_LENGTH];
-            snprintf(full_device_path, sizeof(full_device_path), "%s/%s", "/dev/input", entry.d_name);
+            snprintf(full_device_path, sizeof(full_device_path), "%s/%s", "/dev/input", entry->d_name);
             bool found = false;
             for(uint i = 0; i < ArrayCount(context->controller_info); i++)
             {
@@ -1166,9 +1167,9 @@ hhxcb_refresh_controllers(hhxcb_context *context)
             ioctl(fd, JSIOCGAXES, &axes);
             uint8 buttons;
             ioctl(fd, JSIOCGBUTTONS, &buttons);
-            printf("%s: %s, v%u, axes: %u, buttons: %u\n", entry.d_name, name, version, axes, buttons);
+            printf("%s: %s, v%u, axes: %u, buttons: %u\n", entry->d_name, name, version, axes, buttons);
 
-            snprintf(use->path, sizeof(use->path), "%s/%s", "/dev/input", entry.d_name);
+            snprintf(use->path, sizeof(use->path), "%s/%s", "/dev/input", entry->d_name);
             use->is_active = true;
             use->fd = fd;
             use->axis_dead_zones[0] = 7849;
