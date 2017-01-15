@@ -1,0 +1,44 @@
+diff --git a/code/handmade_debug_interface.h b/code/handmade_debug_interface.h
+index f5b7d7e..3ac3b96 100644
+--- a/code/handmade_debug_interface.h
++++ b/code/handmade_debug_interface.h
+@@ -127,10 +127,10 @@ u64 ArrayIndex_EventIndex = AtomicAddU64(&GlobalDebugTable->EventArrayIndex_Even
+ {RecordDebugEvent(DebugType_FrameMarker, DEBUG_NAME("Frame Marker"), "Frame Marker"); \
+     Event->Value_r32 = SecondsElapsedInit;}
+ 
+-#define TIMED_BLOCK__(GUID, Name, Number, ...) timed_block TimedBlock_##Number(GUID, Name, ## __VA_ARGS__)
++#define TIMED_BLOCK__(GUID, Name, Number, ...) timed_block TimedBlock_##Number(GUID, (char *)Name, ## __VA_ARGS__)
+ #define TIMED_BLOCK_(GUID, Name, Number, ...) TIMED_BLOCK__(GUID, Name, Number, ## __VA_ARGS__)
+ #define TIMED_BLOCK(Name, ...) TIMED_BLOCK_(DEBUG_NAME(Name), Name, __COUNTER__, ## __VA_ARGS__)
+-#define TIMED_FUNCTION(...) TIMED_BLOCK_(DEBUG_NAME(__FUNCTION__), __FUNCTION__, ## __VA_ARGS__)
++#define TIMED_FUNCTION(...) TIMED_BLOCK_(DEBUG_NAME(__FUNCTION__), __FUNCTION__, 23, ## __VA_ARGS__)
+ 
+ #define BEGIN_BLOCK_(GUID, Name) {RecordDebugEvent(DebugType_BeginBlock, GUID, Name);}
+ #define END_BLOCK_(GUID, Name) {RecordDebugEvent(DebugType_EndBlock, GUID, Name);}
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index 624d384..738fc24 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -342,8 +342,8 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                    GL_TEXTURE_2D, TextureHandle,
+                                    0);
+-            GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+-            Assert(Status == GL_FRAMEBUFFER_COMPLETE);
++            GLenum Status1 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++            Assert(Status1 == GL_FRAMEBUFFER_COMPLETE);
+         }
+         
+         GlobalFramebufferCount = NewFramebufferCount;
+@@ -360,7 +360,10 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+         
+         if(TargetIndex == 0)
+         {
+-            glScissor(0, 0, WindowWidth, WindowHeight); 
++            // NOTE: workaround x11/xcb wrong reported window dimensions
++#define START_HEIGHT 1080
++            glScissor(0, (START_HEIGHT - GlobalWindowHeight),
++                      WindowWidth, WindowHeight); 
+         }
+         else
+         {
