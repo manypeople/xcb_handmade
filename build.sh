@@ -3,6 +3,8 @@
 set -e
 set -u
 
+build/opt/ctime -begin xcb_handmade.ctm
+
 ## was using c++11, but it didn't like variadic macros leaving a trailing
 ## comma if the "__VA_ARGS__" was empty, so I switched to gnu++11
 CPPSTD="-std=gnu++11"
@@ -120,3 +122,5 @@ rm build/opt/lock.tmp
 #g++ -DGAME_CODE_FILENAME=libalternate.so -std=c++0x ${WARNFLAGS} -o build/opt/xcb_alternate src/xcb_handmade.cpp ${CPPFLAGS} ${XCBLIBS} ${OPT_FLAGS}
 
 fi
+
+build/opt/ctime -end xcb_handmade.ctm

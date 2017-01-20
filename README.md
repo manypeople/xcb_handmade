@@ -42,6 +42,15 @@ they are labeled with, if you find the code will still not compile, try one
 of the later files. You will only need to apply one of these diff files for
 any given day.
 
+CTime
+-----
+
+If you want to use Casey's ctime to measure your build times, you can use
+ctime/ctime.diff to patch Casey's ctime.c to make it compile on linux.
+Just change into Casey's ctime directory and run this command:
+
+     patch ctime.c path/to/xcb_handmade/ctime/ctime.diff
+
 Build process
 -------------
 

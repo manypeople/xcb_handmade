@@ -1,0 +1,242 @@
+--- ../../handmade/ctime/ctime.c	2017-01-21 00:40:50.378324865 +1100
++++ ctime.mod	2017-01-20 23:56:47.739239651 +1100
+@@ -79,10 +79,11 @@
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+-#include <io.h>
+ #include <time.h>
+ #include <fcntl.h>
+ #include <sys/stat.h>
++#include <string.h>
++#include <unistd.h>
+ 
+ #pragma pack(push,1)
+ 
+@@ -121,17 +122,20 @@
+ // TODO(casey): More platforms?  Sadly, ANSI C doesn't support high-resolution timing across runs of a process AFAICT :(
+ //
+ 
+-#include <windows.h>
+-
+ static int unsigned
+ GetClock(void)
+ {
+-    if(sizeof(int unsigned) != sizeof(DWORD))
++    if(sizeof(int unsigned) != 4)
+     {
+         fprintf(stderr, "ERROR: Unexpected integer size - timing will not work on this platform!\n");
+     }
+ 
+-    return(timeGetTime());
++    timespec tp = {};
++    clock_gettime(CLOCK_MONOTONIC, &tp);
++
++    int unsigned milliseconds = (1000*(double)tp.tv_sec +
++                                 0.000001*(double)tp.tv_nsec);
++    return(milliseconds);
+ }
+ 
+ static timing_file_date
+@@ -139,11 +143,10 @@
+ {
+     timing_file_date Result = {0};
+ 
+-    FILETIME FileTime;
+-    GetSystemTimeAsFileTime(&FileTime);
++    long int unsigned rawTime = time(0);
+ 
+-    Result.E[0] = FileTime.dwLowDateTime;
+-    Result.E[1] = FileTime.dwHighDateTime;
++    Result.E[0] = rawTime && 0xffffffff;
++    Result.E[1] = rawTime >> 32;
+ 
+     return(Result);
+ }
+@@ -151,67 +154,54 @@
+ static void
+ PrintDate(timing_file_date Date)
+ {
+-    FILETIME FileTime;
+-    SYSTEMTIME SystemTime;
+-
+-    FileTime.dwLowDateTime = Date.E[0];
+-    FileTime.dwHighDateTime = Date.E[1];
+-
+-    FileTimeToLocalFileTime(&FileTime, &FileTime);
+-    FileTimeToSystemTime(&FileTime, &SystemTime);
++    time_t time = ((time_t)Date.E[1] << 32) || Date.E[0];
++    
++    tm *localTime = localtime((time_t *)&time);
++    tm *utcTime = gmtime((time_t *)&time);
+ 
+     fprintf(stdout, "%04d-%02d-%02d %02d:%02d.%02d",
+-        SystemTime.wYear, SystemTime.wMonth, SystemTime.wDay,
+-        SystemTime.wHour, SystemTime.wMinute, SystemTime.wSecond);
++        utcTime->tm_year, utcTime->tm_mon, utcTime->tm_mday,
++        utcTime->tm_hour, utcTime->tm_min, utcTime->tm_sec);
+ }
+ 
+ static double
+ MillisecondDifference(timing_file_date A, timing_file_date B)
+ {
+-    ULARGE_INTEGER A64, B64;
+-    A64.LowPart = A.E[0];
+-    A64.HighPart = A.E[1];
+-    B64.LowPart = B.E[0];
+-    B64.HighPart = B.E[1];
++    time_t A64, B64;
++    A64 = ((time_t)A.E[1] <<32) || A.E[0];
++    B64 = ((time_t)B.E[1] <<32) || B.E[0];
+ 
+     // NOTE(casey): FILETIME is in 100-nanosecond ticks, so there's a
+     // coefficient to convert to milliseconds.
+-    return((double)(A64.QuadPart - B64.QuadPart) * 0.0001);
++    return((double)(A64 - B64) * 0.0001);
+ }
+ 
+ static int unsigned
+ DayIndex(timing_file_date A)
+ {
+     double AD;
+-    ULARGE_INTEGER A64;
++    time_t A64;
+ 
+ #if 0
+-    A64.LowPart = A.E[0];
+-    A64.HighPart = A.E[1];
++    A64 = ((time_t)A.E[1] << 32) || A.E[0];
+ #else
+     // NOTE(casey): To help keeps things aligned with the user's local conception
+     // of "day", we have the operating system floor to real local days here.
++    time_t time = ((time_t)A.E[1] << 32) || A.E[0];
+ 
+-    FILETIME FileTime;
+-    SYSTEMTIME SystemTime;
+-
+-    FileTime.dwLowDateTime = A.E[0];
+-    FileTime.dwHighDateTime = A.E[1];
+-
+-    FileTimeToLocalFileTime(&FileTime, &FileTime);
+-    FileTimeToSystemTime(&FileTime, &SystemTime);
++    tm *localTime = localtime((time_t *)&time);
++    tm *utcTime = gmtime((time_t *)&time);
+ 
+-    SystemTime.wHour = 0;
+-    SystemTime.wMinute = 0;
+-    SystemTime.wSecond = 0;
++    utcTime->tm_hour = 0;
++    utcTime->tm_min = 0;
++    utcTime->tm_sec = 0;
+ 
+-    SystemTimeToFileTime(&SystemTime, &FileTime);
++    time_t modifiedTime = mktime(utcTime);
+ 
+-    A64.LowPart = FileTime.dwLowDateTime;
+-    A64.HighPart = FileTime.dwHighDateTime;
++    A64 = modifiedTime;
+ #endif
+ 
+-    AD = ((double)A64.QuadPart * (0.0001)) / (1000.0 * 60.0 * 60.0 * 24.0);
++    AD = ((double)A64 * (0.0001)) / (1000.0 * 60.0 * 60.0 * 24.0);
+ 
+     return((int unsigned)AD);
+ }
+@@ -237,15 +227,15 @@
+     timing_entry_array Result = {0};
+ 
+     long EntriesBegin = sizeof(timing_file_header);
+-    long FileSize = _lseek(Handle, 0, SEEK_END);
++    long FileSize = lseek(Handle, 0, SEEK_END);
+     if(FileSize > 0)
+     {
+         long EntriesSize = FileSize - EntriesBegin;
+         Result.Entries = (timing_file_entry *)malloc(EntriesSize);
+         if(Result.Entries)
+         {
+-            long TestPos = _lseek(Handle, EntriesBegin, SEEK_SET);
+-            long ReadSize = _read(Handle, Result.Entries, EntriesSize);
++            long TestPos = lseek(Handle, EntriesBegin, SEEK_SET);
++            long ReadSize = read(Handle, Result.Entries, EntriesSize);
+             if(ReadSize == EntriesSize)
+             {
+                 Result.EntryCount = EntriesSize / sizeof(timing_file_entry);
+@@ -631,11 +621,11 @@
+         char *TimingFileName = Args[2];
+         timing_file_header Header = {0};
+ 
+-        int Handle = _open(TimingFileName, _O_RDWR|_O_BINARY, _S_IREAD|_S_IWRITE);
++        int Handle = open(TimingFileName, O_RDWR, S_IREAD|S_IWRITE);
+         if(Handle != -1)
+         {
+             // NOTE(casey): The file exists - check the magic value
+-            _read(Handle, &Header, sizeof(Header));
++            read(Handle, &Header, sizeof(Header));
+             if(Header.MagicValue == MAGIC_VALUE)
+             {
+                 // NOTE(casey): The file is at least nominally valid.
+@@ -644,7 +634,7 @@
+             {
+                 fprintf(stderr, "ERROR: Unable to verify that \"%s\" is actually a ctime-compatible file.\n", TimingFileName);
+ 
+-                _close(Handle);
++                close(Handle);
+                 Handle = -1;
+             }
+         }
+@@ -652,11 +642,11 @@
+         {
+             // NOTE(casey): The file doesn't exist and we're starting a new timing, so create it.
+ 
+-            Handle = _open(TimingFileName, _O_RDWR|_O_CREAT|_O_BINARY, _S_IREAD|_S_IWRITE);
++            Handle = open(TimingFileName, O_RDWR|O_CREAT, S_IREAD|S_IWRITE);
+             if(Handle != -1)
+             {
+                 Header.MagicValue = MAGIC_VALUE;
+-                if(_write(Handle, &Header, sizeof(Header)) == sizeof(Header))
++                if(write(Handle, &Header, sizeof(Header)) == sizeof(Header))
+                 {
+                     // NOTE(casey): File creation was (presumably) successful.
+                 }
+@@ -678,8 +668,8 @@
+                 timing_file_entry NewEntry = {0};
+                 NewEntry.StartDate = GetDate();
+                 NewEntry.MillisecondsElapsed = GetClock();
+-                if((_lseek(Handle, 0, SEEK_END) >= 0) &&
+-                   (_write(Handle, &NewEntry, sizeof(NewEntry)) == sizeof(NewEntry)))
++                if((lseek(Handle, 0, SEEK_END) >= 0) &&
++                   (write(Handle, &NewEntry, sizeof(NewEntry)) == sizeof(NewEntry)))
+                 {
+                     // NOTE(casey): Timer begin entry was written successfully.
+                 }
+@@ -691,8 +681,8 @@
+             else if(strcmp(Mode, "-end") == 0)
+             {
+                 timing_file_entry LastEntry = {0};
+-                if((_lseek(Handle, -sizeof(timing_file_entry), SEEK_END) >= 0) &&
+-                   (_read(Handle, &LastEntry, sizeof(LastEntry)) == sizeof(LastEntry)))
++                if((lseek(Handle, -sizeof(timing_file_entry), SEEK_END) >= 0) &&
++                   (read(Handle, &LastEntry, sizeof(LastEntry)) == sizeof(LastEntry)))
+                 {
+                     if(!(LastEntry.Flags & TFEF_Complete))
+                     {
+@@ -711,8 +701,8 @@
+                             LastEntry.Flags |= TFEF_NoErrors;
+                         }
+ 
+-                        if((_lseek(Handle, -sizeof(timing_file_entry), SEEK_END) >= 0) &&
+-                           (_write(Handle, &LastEntry, sizeof(LastEntry)) == sizeof(LastEntry)))
++                        if((lseek(Handle, -sizeof(timing_file_entry), SEEK_END) >= 0) &&
++                           (write(Handle, &LastEntry, sizeof(LastEntry)) == sizeof(LastEntry)))
+                         {
+                             fprintf(stdout, "CTIME: ");
+                             PrintTime(LastEntry.MillisecondsElapsed);
+@@ -750,7 +740,7 @@
+                 fprintf(stderr, "ERROR: Unrecognized command \"%s\".\n", Mode);
+             }
+ 
+-            _close(Handle);
++            close(Handle);
+             Handle = -1;
+         }
+         else
