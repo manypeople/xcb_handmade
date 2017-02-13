@@ -100,7 +100,6 @@ global_variable b32 GlobalSoftwareRendering;
 global_variable u32 GlobalWindowWidth;
 global_variable u32 GlobalWindowHeight;
 global_variable b32 GlobalPause;
-global_variable b32 GlobalShowSortGroups;
 
 #undef GL_ARB_framebuffer_object
 
@@ -2124,7 +2123,6 @@ main()
         {DEBUG_DATA_BLOCK("Platform/Controls");
             DEBUG_B32(GlobalPause);
             DEBUG_B32(GlobalSoftwareRendering);
-            DEBUG_B32(GlobalShowSortGroups);
         }
         
 		//
