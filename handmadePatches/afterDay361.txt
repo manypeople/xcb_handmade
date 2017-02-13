@@ -1,0 +1,27 @@
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index fabb775..d58aba1 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -323,8 +323,8 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                    GL_TEXTURE_2D, TextureHandle,
+                                    0);
+-            GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+-            Assert(Status == GL_FRAMEBUFFER_COMPLETE);
++            GLenum Status1 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++            Assert(Status1 == GL_FRAMEBUFFER_COMPLETE);
+         }
+         
+         GlobalFramebufferCount = NewFramebufferCount;
+@@ -341,7 +341,10 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+         
+         if(TargetIndex == 0)
+         {
+-            glScissor(0, 0, WindowWidth, WindowHeight);
++            // NOTE: workaround x11/xcb wrong reported window dimensions
++#define START_HEIGHT 1080
++            glScissor(0, (START_HEIGHT - GlobalWindowHeight),
++                      WindowWidth, WindowHeight); 
+         }
+         else
+         {
