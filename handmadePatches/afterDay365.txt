@@ -1,0 +1,59 @@
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index bb56ba6..275dffc 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -333,8 +333,8 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+                                    0);
+             // TODO(casey): Create a depth buffer for this framebuffer
+             // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, TextureHandle, 0);
+-            GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+-            Assert(Status == GL_FRAMEBUFFER_COMPLETE);
++            GLenum Status1 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++            Assert(Status1 == GL_FRAMEBUFFER_COMPLETE);
+         }
+         
+         GlobalFramebufferCount = NewFramebufferCount;
+@@ -351,7 +351,10 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+         
+         if(TargetIndex == 0)
+         {
+-            glScissor(0, 0, WindowWidth, WindowHeight);
++            // NOTE: workaround x11/xcb wrong reported window dimensions
++#define START_HEIGHT 1080
++            glScissor(0, (START_HEIGHT - GlobalWindowHeight),
++                      WindowWidth, WindowHeight); 
+         }
+         else
+         {
+diff --git a/code/handmade_render_group.cpp b/code/handmade_render_group.cpp
+index 6bff573..d5b0c4b 100644
+--- a/code/handmade_render_group.cpp
++++ b/code/handmade_render_group.cpp
+@@ -119,11 +119,11 @@ PushBitmap(render_group *Group, object_transform *ObjectTransform,
+         
+         if(ObjectTransform->Upright)
+         {
+-#if 0
++#if 1
++            v2 CardRyz = {0.25f, 0.75f};
+             v2 CamPyz = Group->CameraP.yz;
+-            v2 CamRyz = Entry->P.yz + Size.y*Group->CameraY.yz - Group->CameraP.yz;
++            v2 CamRyz = Entry->P.yz + Size.y*CardRyz - Group->CameraP.yz;
+             v2 CardPyz = Entry->P.yz;
+-            v2 CardRyz = {0.25f, 0.75f};
+             
+             v2 In = RayIntersect2(CamPyz, CamRyz, CardPyz, CardRyz);
+             // TODO(casey): Use the input YAxis again.
+diff --git a/code/handmade_world_mode.cpp b/code/handmade_world_mode.cpp
+index 9bf4082..8d79be4 100644
+--- a/code/handmade_world_mode.cpp
++++ b/code/handmade_world_mode.cpp
+@@ -778,7 +778,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
+         if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Left]))
+         {
+             f32 RotationSpeed = 0.001f*Pi32;
+-            WorldMode->DebugCameraOrbit += RotationSpeed*dMouseP.x;
++            WorldMode->DebugCameraOrbit -= RotationSpeed*dMouseP.x;
+             WorldMode->DebugCameraPitch += RotationSpeed*dMouseP.y;
+         }
+         else if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Middle]))
