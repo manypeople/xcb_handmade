@@ -1,0 +1,40 @@
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index 53b5936..dfee37b 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -366,8 +366,8 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+                                    0);
+             // TODO(casey): Create a depth buffer for this framebuffer
+             // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, TextureHandle, 0);
+-            GLenum Status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+-            Assert(Status == GL_FRAMEBUFFER_COMPLETE);
++            GLenum Status1 = glCheckFramebufferStatus(GL_FRAMEBUFFER);
++            Assert(Status1 == GL_FRAMEBUFFER_COMPLETE);
+         }
+         
+         GlobalFramebufferCount = NewFramebufferCount;
+@@ -384,7 +384,10 @@ OpenGLRenderCommands(game_render_commands *Commands, game_render_prep *Prep,
+         
+         if(TargetIndex == 0)
+         {
+-            glScissor(0, 0, WindowWidth, WindowHeight);
++            // NOTE: workaround x11/xcb wrong reported window dimensions
++#define START_HEIGHT 1080
++            glScissor(0, (START_HEIGHT - GlobalWindowHeight),
++                      WindowWidth, WindowHeight); 
+         }
+         else
+         {
+diff --git a/code/handmade_world_mode.cpp b/code/handmade_world_mode.cpp
+index 48ce3c0..6b9b9a4 100644
+--- a/code/handmade_world_mode.cpp
++++ b/code/handmade_world_mode.cpp
+@@ -785,7 +785,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
+         if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Left]))
+         {
+             f32 RotationSpeed = 0.001f*Pi32;
+-            WorldMode->DebugCameraOrbit += RotationSpeed*dMouseP.x;
++            WorldMode->DebugCameraOrbit -= RotationSpeed*dMouseP.x;
+             WorldMode->DebugCameraPitch += RotationSpeed*dMouseP.y;
+         }
+         else if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Middle]))
