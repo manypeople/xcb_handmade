@@ -80,6 +80,8 @@
 
 #include <GL/glx.h>
 
+#undef Status // NOTE: xlib defines this common word as a macro for an int
+
 // NOTE: casey searches for these strings, so if they are defined,
 // the search string will be replaced by the preprocessor
 #undef GL_EXT_texture_sRGB
@@ -103,11 +105,13 @@ global_variable b32 GlobalPause;
 
 #undef GL_ARB_framebuffer_object
 
+typedef void gl_tex_image_2d_multisample(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
 typedef void gl_bind_framebuffer(GLenum target, GLuint framebuffer);
 typedef void gl_gen_framebuffers(GLsizei n, GLuint *framebuffers);
 typedef void gl_framebuffer_texture_2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
 typedef u32 gl_check_framebuffer_status(GLenum target);
 
+global_variable gl_tex_image_2d_multisample *glTexImage2DMultisample;
 global_variable gl_bind_framebuffer *glBindFramebuffer;
 global_variable gl_gen_framebuffers *glGenFramebuffers;
 global_variable gl_framebuffer_texture_2D *glFramebufferTexture2D;
@@ -1362,6 +1366,8 @@ hhxcbInitOpenGL(hhxcb_context *context)
             glCheckFramebufferStatus = (gl_check_framebuffer_status *)glXGetProcAddress((const GLubyte*)"glCheckFramebufferStatus");
         }
 
+        glTexImage2DMultisample = (gl_tex_image_2d_multisample *)glXGetProcAddress((const GLubyte*)"glTexImage2DMultisample");
+        
 		context->glXSwapInterval =
             (glx_swap_interval_mesa *)glXGetProcAddressARB(
                 (GLubyte *)"glXSwapIntervalMESA");
