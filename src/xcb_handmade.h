@@ -170,6 +170,7 @@ struct hhxcb_context
     xcb_key_symbols_t *key_symbols;
     xcb_window_t window;
 	Display *display;
+    u32 screenNumber;
     GLXFBConfig FBConfig;
 
     b32 useSoftwareRendering;

@@ -93,10 +93,6 @@
 
 platform_api Platform;
 
-global_variable b32 OpenGLSupportsSRGBFramebuffer;
-global_variable GLuint OpenGLDefaultInternalTextureFormat;
-global_variable GLuint OpenGLReservedBlitTexture;
-
 global_variable hhxcb_state GlobalHhxcbState;
 global_variable b32 GlobalSoftwareRendering;
 global_variable u32 GlobalWindowWidth;
@@ -105,17 +101,48 @@ global_variable b32 GlobalPause;
 
 #undef GL_ARB_framebuffer_object
 
+typedef char GLchar;
+
 typedef void gl_tex_image_2d_multisample(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations);
 typedef void gl_bind_framebuffer(GLenum target, GLuint framebuffer);
 typedef void gl_gen_framebuffers(GLsizei n, GLuint *framebuffers);
 typedef void gl_framebuffer_texture_2D(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
 typedef u32 gl_check_framebuffer_status(GLenum target);
+typedef void gl_blit_framebuffer(GLint srcX0, GLint srcY0, GLi\
+nt srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint ds\
+tY1, GLbitfield mask, GLenum filter);
+typedef void gl_attach_shader(GLuint program, GLuint shader);
+typedef void gl_compile_shader(GLuint shader);
+typedef GLuint gl_create_program(void);
+typedef GLuint gl_create_shader(GLenum type);
+typedef void gl_link_program(GLuint program);
+typedef void gl_shader_source(GLuint shader, GLsizei count, GLchar **string, GLint *length);
+typedef void gl_use_program(GLuint program);
+typedef void gl_get_program_info_log(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+typedef void gl_get_shader_info_log(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
+typedef void gl_validate_program(GLuint program);
+typedef void gl_get_program_iv(GLuint program, GLenum pname, GLint *params);
 
 global_variable gl_tex_image_2d_multisample *glTexImage2DMultisample;
 global_variable gl_bind_framebuffer *glBindFramebuffer;
 global_variable gl_gen_framebuffers *glGenFramebuffers;
 global_variable gl_framebuffer_texture_2D *glFramebufferTexture2D;
 global_variable gl_check_framebuffer_status *glCheckFramebufferStatus;
+global_variable gl_blit_framebuffer *glBlitFramebuffer;
+global_variable gl_attach_shader *glAttachShader;
+global_variable gl_compile_shader *glCompileShader;
+global_variable gl_create_program *glCreateProgram;
+global_variable gl_create_shader *glCreateShader;
+global_variable gl_link_program *glLinkProgram;
+global_variable gl_shader_source *glShaderSource;
+global_variable gl_use_program *glUseProgram;
+global_variable gl_get_program_info_log *glGetProgramInfoLog;
+global_variable gl_get_shader_info_log *glGetShaderInfoLog;
+global_variable gl_validate_program *glValidateProgram;
+global_variable gl_get_program_iv *glGetProgramiv;
+
+#include "handmade_opengl.h"
+global_variable open_gl OpenGL;
 
 #include "handmade_sort.cpp"
 #include "handmade_render.h"
@@ -1270,20 +1297,27 @@ int hhxcbOpenGLAttribs[] =
 
 internal GLXContext
 hhxcbInitOpenGL(hhxcb_context *context)
-{
-    // NOTE: don't know of wglGetExtensionsString linux equivalent, so
-    // just setting this to true
-    OpenGLSupportsSRGBFramebuffer = true;
+{            
+    char *Extensions = (char *)glXQueryExtensionsString(context->display, context->screenNumber);
+    char *At = Extensions;
+    while(*At)
+    {
+        while(IsWhitespace(*At)) {++At;}
+        char *End = At;
+        while(*End && !IsWhitespace(*End)) {++End;}
+
+        umm Count = End - At;
+
+        if(0) {}
+        else if(StringsAreEqual(Count, At, "GLX_EXT_framebuffer_sRGB")) {OpenGL.SupportsSRGBFramebuffer = true;}
+        else if(StringsAreEqual(Count, At, "GLX_ARB_framebuffer_sRGB")) {OpenGL.SupportsSRGBFramebuffer = true;}
+                    
+        At = End;
+    }
     
 	s32 desiredVisualPixelFormat[] =
     {	
 		GLX_RGBA,
-		GLX_RED_SIZE, 8,
-		GLX_GREEN_SIZE, 8,
-		GLX_BLUE_SIZE, 8,
-		GLX_ALPHA_SIZE, 8,
-		GLX_DEPTH_SIZE, 24,
-		GLX_STENCIL_SIZE, 8,
 		GLX_DOUBLEBUFFER,
         GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB, GL_TRUE,
 		0
@@ -1315,12 +1349,6 @@ hhxcbInitOpenGL(hhxcb_context *context)
             s32 desiredFBConfigPixelFormat[] = 
             {
                 GLX_RENDER_TYPE, GLX_RGBA_BIT,
-                GLX_RED_SIZE, 8,
-                GLX_GREEN_SIZE, 8,
-                GLX_BLUE_SIZE, 8,
-                GLX_ALPHA_SIZE, 8,
-                GLX_DEPTH_SIZE, 24,
-                GLX_STENCIL_SIZE, 8,
                 GLX_DOUBLEBUFFER, true,
                 GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB, GL_TRUE,
                 0
@@ -1357,7 +1385,7 @@ hhxcbInitOpenGL(hhxcb_context *context)
         }
 
         // NOTE: this function also turns srgb on if it is supported
-        opengl_info Info = OpenGLInit(ModernContext, OpenGLSupportsSRGBFramebuffer);
+        opengl_info Info = OpenGLGetInfo(ModernContext);
         if(Info.GL_ARB_framebuffer_object)
         {
             glBindFramebuffer = (gl_bind_framebuffer *)glXGetProcAddress((const GLubyte*)"glBindFramebuffer");
@@ -1367,6 +1395,19 @@ hhxcbInitOpenGL(hhxcb_context *context)
         }
 
         glTexImage2DMultisample = (gl_tex_image_2d_multisample *)glXGetProcAddress((const GLubyte*)"glTexImage2DMultisample");
+        glBlitFramebuffer = (gl_blit_framebuffer *)glXGetProcAddress((const GLubyte*)"glBlitFramebuffer");
+        
+        glAttachShader = (gl_attach_shader *)glXGetProcAddress((const GLubyte*)"glAttachShader");
+        glCompileShader = (gl_compile_shader *)glXGetProcAddress((const GLubyte*)"glCompileShader");
+        glCreateProgram = (gl_create_program *)glXGetProcAddress((const GLubyte*)"glCreateProgram");
+        glCreateShader = (gl_create_shader *)glXGetProcAddress((const GLubyte*)"glCreateShader");
+        glLinkProgram = (gl_link_program *)glXGetProcAddress((const GLubyte*)"glLinkProgram");
+        glShaderSource = (gl_shader_source *)glXGetProcAddress((const GLubyte*)"glShaderSource");
+        glUseProgram = (gl_use_program *)glXGetProcAddress((const GLubyte*)"glUseProgram");
+        glGetProgramInfoLog = (gl_get_program_info_log *)glXGetProcAddress((const GLubyte*)"glGetProgramInfoLog");
+        glGetShaderInfoLog = (gl_get_shader_info_log *)glXGetProcAddress((const GLubyte*)"glGetShaderInfoLog");
+        glValidateProgram = (gl_validate_program *)glXGetProcAddress((const GLubyte*)"glValidateProgram");
+        glGetProgramiv = (gl_get_program_iv *)glXGetProcAddress((const GLubyte*)"glGetProgramiv");
         
 		context->glXSwapInterval =
             (glx_swap_interval_mesa *)glXGetProcAddressARB(
@@ -1376,7 +1417,7 @@ hhxcbInitOpenGL(hhxcb_context *context)
             context->glXSwapInterval(1);
 		}
 
-        glGenTextures(1, &OpenGLReservedBlitTexture);
+        OpenGLInit(Info, OpenGL.SupportsSRGBFramebuffer);
 	}
 	else
 	{
@@ -1436,7 +1477,7 @@ hhxcbDisplayBufferInWindow(hhxcb_context *context,
                             OutputTarget.Pitch,
                             DrawRegion,
                             Commands->ClearColor,
-                            OpenGLReservedBlitTexture);
+                            OpenGL.ReservedBlitTexture);
             
         glXSwapBuffers(context->display, context->window);
     }
@@ -1955,6 +1996,7 @@ main()
 //    int screenNum;
 //    context.connection = xcb_connect (NULL, &screenNum);
     context.display = XOpenDisplay(0);
+    context.screenNumber = XDefaultScreen(context.display);
     context.connection = XGetXCBConnection(context.display);
 
     context.key_symbols = xcb_key_symbols_alloc(context.connection);
