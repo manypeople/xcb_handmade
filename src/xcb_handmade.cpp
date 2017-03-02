@@ -31,7 +31,6 @@
    - fullscreen toggle
    - desktop fade in/out
    - replace xcb with xlib
-   - get window resize working properly
 */
 
 #include <sys/mman.h> // mmap, PROT_*, MAP_*
@@ -95,8 +94,6 @@ platform_api Platform;
 
 global_variable hhxcb_state GlobalHhxcbState;
 global_variable b32 GlobalSoftwareRendering;
-global_variable u32 GlobalWindowWidth;
-global_variable u32 GlobalWindowHeight;
 global_variable b32 GlobalPause;
 
 #undef GL_ARB_framebuffer_object
@@ -1069,6 +1066,7 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                         u32 mouseButtonIndex = (e->button - 1);
                         hhxcb_process_keyboard_message(&new_input->MouseButtons[mouseButtonIndex], is_down);
                     }
+                    break;
                 }
                 case NoExpose:
                 {
@@ -1087,7 +1085,7 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                     r32 MouseU = Clamp01MapToRange((r32)DrawRegion->MinX, MouseX, (r32)DrawRegion->MaxX);
                     r32 MouseV = Clamp01MapToRange((r32)DrawRegion->MinY, MouseY, (r32)DrawRegion->MaxY);
                             
-                    new_input->MouseX = (r32)RenderCommands->Width*MouseU;
+                     new_input->MouseX = (r32)RenderCommands->Width*MouseU;
                     new_input->MouseY = (r32)RenderCommands->Height*MouseV;
 
                     break;
@@ -1106,17 +1104,85 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                     }
                     break;
                 }
-                case ResizeRequest:
+                // NOTE: notification when window manager reparents our
+                // window under it's own window which has the window
+                // decorations
+                case ReparentNotify:
                 {
-                    XResizeRequestEvent *resize = (XResizeRequestEvent *)&event;
-                    GlobalWindowWidth = resize->width;
-                    GlobalWindowHeight = resize->height;
-#if 0
-                    hhxcbDisplayBufferInWindow(context, buffer,
-                                               resize->width, resize->height);
-#endif
+                    //printf("reparent\n");
                     break;
                 }
+                // NOTE: these events are only sent to this window if
+                // ResizeRedirectMask is set on the window. Setting this
+                // also prevents the window manager (i3, maybe others) from
+                // resizing our window. It also prevents us from
+                // resizing our window with XResizeWindow because the
+                // window manager has SubstructureRedirectMask set on our
+                // parent window (the window decoration window) and this
+                // overrides the ResizeRedirectMask
+                /*case ResizeRequest:
+                {
+                    XResizeRequestEvent *rr = (XResizeRequestEvent *)&event;
+                    printf("resizeRequest: %d(window) %d %d %d\n", rr->window, context->window, rr->width, rr->height);
+                    break;
+                }*/
+                // NOTE: this is not like WM_WINDOWPOSCHANGING in windows.
+                // This event is more like WM_WINDOWPOSCHANGED. The window
+                // manager has already resized, I think that is why it
+                // flickers as you are resizing?
+                case ConfigureNotify:
+                {
+                    // NOTE: when resizing, ConfigureNotify events spam
+                    // the event queue, preventing the updating of the shift
+                    // key state, so while resizing, you cannot switch
+                    // between holding shift (keeping aspect ratio fixed)
+                    // and not holding shift (free resize). If xwindows
+                    // supported directly retrieving key state like
+                    // GetKeyState() does on windows, this would be possible
+                    if(new_input->ShiftDown)
+                    {
+                        // NOTE: the widths and heights in this event seem
+                        // suspect, XGetGeometry gives much better values
+                        XConfigureEvent *cn = (XConfigureEvent *)&event;
+
+                        hhxcb_window_dimension dim;
+                        XGetGeometry(context->display, context->window,
+                                     &dim.rootWindow, &dim.x, &dim.y,
+                                     &dim.width, &dim.height,
+                                     &dim.borderWidth, &dim.depth);
+                        //printf("configureNotify: %d %d %d %d\n", cn->width, cn->height, dim.width, dim.height);
+
+                        f32 widthAspectRatio = (f32)buffer->width / (f32)buffer->height;
+                        f32 heightAspectRatio = 1 / widthAspectRatio;
+                        u32 newWidth = widthAspectRatio * dim.height;
+                        u32 newHeight = heightAspectRatio * dim.width;
+
+                        if(AbsoluteValue((r32)(dim.width - newWidth)) <
+                           AbsoluteValue((r32)(dim.height - newHeight)))
+                        {
+                            dim.width = newWidth;
+                        }
+                        else
+                        {
+                            dim.height = newHeight;
+                        }
+                    
+                        XResizeWindow(context->display, context->window,
+                                      dim.width, dim.height);
+                    }
+                    break;
+                }
+                // NOTE: to get this event, you must set SubstructureRedirectMask
+                // on your window, then if any direct child window tries to
+                // configure their window, a ConfigureRequest is sent to you
+                // and you can decide what to do on the child windowa
+                // behalf. This is commonly used by window managers
+                /*case ConfigureRequest:
+                {
+                    XConfigureRequestEvent *cr = (XConfigureRequestEvent *)&event;
+                    printf("configureRequest: %d %d\n", cr->width, cr->height);
+                    break;
+                }*/
                 default:
                 {
                     break;
@@ -1446,8 +1512,8 @@ hhxcbDisplayBufferInWindow(hhxcb_context *context,
 						   hhxcb_offscreen_buffer *buffer,
                            platform_work_queue *RenderQueue,
                            game_render_commands *Commands,
-						   rectangle2i DrawRegion,
-                           memory_arena *TempArena)
+						   rectangle2i DrawRegion, u32 windowWidth,
+                           u32 windowHeight, memory_arena *TempArena)
 {
     temporary_memory TempMem = BeginTemporaryMemory(TempArena);
     
@@ -1471,10 +1537,10 @@ hhxcbDisplayBufferInWindow(hhxcb_context *context,
 
         SoftwareRenderCommands(RenderQueue, Commands, &Prep, &OutputTarget, TempArena);
 
-        OpenGLDisplayBitmap(OutputTarget.Width,
-                            OutputTarget.Height,
-                            OutputTarget.Memory,
-                            OutputTarget.Pitch,
+        OpenGLDisplayBitmap(buffer->width,
+                            buffer->height,
+                            buffer->memory,
+                            buffer->pitch,
                             DrawRegion,
                             Commands->ClearColor,
                             OpenGL.ReservedBlitTexture);
@@ -1484,7 +1550,7 @@ hhxcbDisplayBufferInWindow(hhxcb_context *context,
 	else
 	{
         BEGIN_BLOCK("OpenGLRenderCommands");
-		OpenGLRenderCommands(Commands, &Prep, DrawRegion, GlobalWindowWidth, GlobalWindowHeight);
+		OpenGLRenderCommands(Commands, &Prep, DrawRegion, windowWidth, windowHeight);
         END_BLOCK();
         
         BEGIN_BLOCK("SwapBuffers");
@@ -2032,13 +2098,14 @@ main()
 		| XCB_EVENT_MASK_KEY_RELEASE
 		| XCB_EVENT_MASK_BUTTON_PRESS
 		| XCB_EVENT_MASK_BUTTON_RELEASE
-		| XCB_EVENT_MASK_RESIZE_REDIRECT
+		//| XCB_EVENT_MASK_RESIZE_REDIRECT
+        | XCB_EVENT_MASK_STRUCTURE_NOTIFY
 		,
     };
 
 //#define START_WIDTH 960
 //#define START_HEIGHT 540
-	
+
 #define START_WIDTH 1920
 #define START_HEIGHT 1080
 
@@ -2066,12 +2133,19 @@ main()
     xcb_icccm_set_wm_protocols(context.connection, context.window,
             context.wm_protocols, 1, protocols);
 
-    xcb_size_hints_t hints = {};
+    // NOTE: this seems useless
+/*    xcb_size_hints_t hints = {};
     xcb_icccm_size_hints_set_max_size(&hints, START_WIDTH, START_HEIGHT);
     xcb_icccm_size_hints_set_min_size(&hints, START_WIDTH, START_HEIGHT);
     xcb_icccm_set_wm_size_hints(context.connection, context.window,
             XCB_ICCCM_WM_STATE_NORMAL, &hints);
+*/
 
+    /* NOTE(casey): 1080p display mode is 1920x1080 -> Half of that is 960x540
+       1920 -> 2048 = 2048-1920 -> 128 pixels
+       1080 -> 2048 = 2048-1080 -> pixels 968
+       1024 + 128 = 1152
+    */
     hhxcb_offscreen_buffer buffer = {};
     hhxcb_resize_backbuffer(&context, &buffer, START_WIDTH, START_HEIGHT);
 
@@ -2177,6 +2251,13 @@ main()
 		//
 		//
 
+        // NOTE: seconds per frame
+        new_input->dtForFrame = target_nanoseconds_per_frame / (1000.0 * 1000.0 * 1000.0);
+
+        //
+        //
+        //
+
 		BEGIN_BLOCK("InputProcessing");
 
         game_render_commands RenderCommands = RenderCommandStruct(
@@ -2184,33 +2265,11 @@ main()
             buffer.width,
             buffer.height);
         
-        // NOTE: XGetGeometry does not seem to get the right values. It just
-        // seems to return the initially set values. This seems to be due
-        // to xcb resize/move function (run by the window manager) not
-        // setting the values after a resize
-		//hhxcb_window_dimension dimension = hhxcbGetWindowDimension(&context);
-        //printf("x: %d   y: %d   w: %d  h: %d\n", dimension.x, dimension.y, dimension.width, dimension.height);
-
-        // NOTE: xcb equivalent function doesn't get the right values either
-        //xcb_get_geometry_cookie_t cook = xcb_get_geometry(context.connection, context.window);
-        //xcb_get_geometry_reply_t *rep = xcb_get_geometry_reply(context.connection, cook, 0);
-        //printf("x: %d   y: %d   w: %d  h: %d\n", rep->x, rep->y, rep->width, rep->height);
-        
+        hhxcb_window_dimension dimension = hhxcbGetWindowDimension(&context);     
         rectangle2i DrawRegion = AspectRatioFit(
             RenderCommands.Width, RenderCommands.Height,
-            GlobalWindowWidth, GlobalWindowHeight);
-        
-        // NOTE: fixup to get opengl to draw in the right place. I think
-        // this is due to an xcb bug where the window size
-        // isn't updated when the window is resized. So opengl will use 
-        // the initially set lower left corner of the window as it's
-        // reference point, even when the window is resized and that point
-        // is no longer the lower left corner of the window
-        DrawRegion.MinY += START_HEIGHT - GlobalWindowHeight;
-        DrawRegion.MaxY += START_HEIGHT - GlobalWindowHeight;
-        
-        new_input->dtForFrame = target_nanoseconds_per_frame / (1000.0 * 1000.0 * 1000.0);
-        
+            dimension.width, dimension.height);
+                
         if (last_counter.tv_sec >= next_controller_refresh)
         {
             hhxcb_refresh_controllers(&context);
@@ -2477,8 +2536,8 @@ main()
         
 		hhxcbDisplayBufferInWindow(&context, &buffer,
                                    &HighPriorityQueue, &RenderCommands,
-                                   DrawRegion,
-                                   &FrameTempArena);
+                                   DrawRegion, dimension.width,
+                                   dimension.height, &FrameTempArena);
 		
         game_input *temp_input = new_input;
         new_input = old_input;

@@ -1,0 +1,13 @@
+diff --git a/code/handmade_world_mode.cpp b/code/handmade_world_mode.cpp
+index 3e3422c..58ed85c 100644
+--- a/code/handmade_world_mode.cpp
++++ b/code/handmade_world_mode.cpp
+@@ -786,7 +786,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
+         if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Left]))
+         {
+             f32 RotationSpeed = 0.001f*Pi32;
+-            WorldMode->DebugCameraOrbit += RotationSpeed*dMouseP.x;
++            WorldMode->DebugCameraOrbit -= RotationSpeed*dMouseP.x;
+             WorldMode->DebugCameraPitch += RotationSpeed*dMouseP.y;
+         }
+         else if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Middle]))
