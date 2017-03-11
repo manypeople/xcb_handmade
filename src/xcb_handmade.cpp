@@ -119,6 +119,10 @@ typedef void gl_get_program_info_log(GLuint program, GLsizei bufSize, GLsizei *l
 typedef void gl_get_shader_info_log(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
 typedef void gl_validate_program(GLuint program);
 typedef void gl_get_program_iv(GLuint program, GLenum pname, GLint *params);
+typedef GLint gl_get_uniform_location (GLuint program, const GLchar *name);
+typedef void gl_uniform_4fv(GLint location, GLsizei count, const GLfloat *value);
+typedef void gl_uniform_matrix_4fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
+typedef void gl_uniform_1i(GLint location, GLint v0);
 
 global_variable gl_tex_image_2d_multisample *glTexImage2DMultisample;
 global_variable gl_bind_framebuffer *glBindFramebuffer;
@@ -137,6 +141,10 @@ global_variable gl_get_program_info_log *glGetProgramInfoLog;
 global_variable gl_get_shader_info_log *glGetShaderInfoLog;
 global_variable gl_validate_program *glValidateProgram;
 global_variable gl_get_program_iv *glGetProgramiv;
+global_variable gl_get_uniform_location *glGetUniformLocation;
+global_variable gl_uniform_4fv *glUniform4fv;
+global_variable gl_uniform_matrix_4fv *glUniformMatrix4fv;
+global_variable gl_uniform_1i *glUniform1i;
 
 #include "handmade_opengl.h"
 global_variable open_gl OpenGL;
@@ -1474,6 +1482,10 @@ hhxcbInitOpenGL(hhxcb_context *context)
         glGetShaderInfoLog = (gl_get_shader_info_log *)glXGetProcAddress((const GLubyte*)"glGetShaderInfoLog");
         glValidateProgram = (gl_validate_program *)glXGetProcAddress((const GLubyte*)"glValidateProgram");
         glGetProgramiv = (gl_get_program_iv *)glXGetProcAddress((const GLubyte*)"glGetProgramiv");
+        glGetUniformLocation = (gl_get_uniform_location *)glXGetProcAddress((const GLubyte*)"glGetUniformLocation");
+        glUniform4fv = (gl_uniform_4fv *)glXGetProcAddress((const GLubyte*)"glUniform4fv");
+        glUniformMatrix4fv = (gl_uniform_matrix_4fv *)glXGetProcAddress((const GLubyte*)"glUniformMatrix4fv");
+        glUniform1i = (gl_uniform_1i *)glXGetProcAddress((const GLubyte*)"glUniform1i");
         
 		context->glXSwapInterval =
             (glx_swap_interval_mesa *)glXGetProcAddressARB(
