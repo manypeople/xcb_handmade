@@ -1366,6 +1366,7 @@ int hhxcbOpenGLAttribs[] =
 #endif
     ,
     GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+//    GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
     0,
 };
 
@@ -2196,7 +2197,11 @@ main()
     u32 PushBufferSize = Megabytes(64);
     platform_memory_block *PushBufferBlock = hhxcbAllocateMemory(PushBufferSize, PlatformMemory_NotRestored);
     u8 *PushBuffer = PushBufferBlock->Base;
-	
+
+    u32 MaxVertexCount = 65536;
+    platform_memory_block *VertexArrayBlock = hhxcbAllocateMemory(MaxVertexCount*sizeof(textured_vertex), PlatformMemory_NotRestored);
+    textured_vertex *VertexArray = (textured_vertex *)VertexArrayBlock->Base;
+    
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
     game_memory m = {};
@@ -2274,8 +2279,8 @@ main()
 
         game_render_commands RenderCommands = RenderCommandStruct(
             PushBufferSize, PushBuffer,
-            buffer.width,
-            buffer.height);
+            buffer.width, buffer.height,
+            MaxVertexCount, VertexArray);
         
         hhxcb_window_dimension dimension = hhxcbGetWindowDimension(&context);     
         rectangle2i DrawRegion = AspectRatioFit(
