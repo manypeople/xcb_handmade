@@ -123,6 +123,13 @@ typedef GLint gl_get_uniform_location (GLuint program, const GLchar *name);
 typedef void gl_uniform_4fv(GLint location, GLsizei count, const GLfloat *value);
 typedef void gl_uniform_matrix_4fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
 typedef void gl_uniform_1i(GLint location, GLint v0);
+typedef void type_glEnableVertexAttribArray(GLuint index);
+typedef void type_glDisableVertexAttribArray(GLuint index);
+typedef GLint type_glGetAttribLocation(GLuint program, const GLchar *name);
+typedef void type_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+
+#define OpenGLGlobalFunction(Name) global_variable type_##Name *Name;
+
 
 global_variable gl_tex_image_2d_multisample *glTexImage2DMultisample;
 global_variable gl_bind_framebuffer *glBindFramebuffer;
@@ -146,11 +153,16 @@ global_variable gl_uniform_4fv *glUniform4fv;
 global_variable gl_uniform_matrix_4fv *glUniformMatrix4fv;
 global_variable gl_uniform_1i *glUniform1i;
 
+OpenGLGlobalFunction(glEnableVertexAttribArray);
+OpenGLGlobalFunction(glDisableVertexAttribArray);
+OpenGLGlobalFunction(glGetAttribLocation);
+OpenGLGlobalFunction(glVertexAttribPointer);
+
+#include "handmade_render.h"
 #include "handmade_opengl.h"
 global_variable open_gl OpenGL;
 
 #include "handmade_sort.cpp"
-#include "handmade_render.h"
 #include "handmade_opengl.cpp"
 #include "handmade_render.cpp"
 
@@ -1487,7 +1499,13 @@ hhxcbInitOpenGL(hhxcb_context *context)
         glUniform4fv = (gl_uniform_4fv *)glXGetProcAddress((const GLubyte*)"glUniform4fv");
         glUniformMatrix4fv = (gl_uniform_matrix_4fv *)glXGetProcAddress((const GLubyte*)"glUniformMatrix4fv");
         glUniform1i = (gl_uniform_1i *)glXGetProcAddress((const GLubyte*)"glUniform1i");
-        
+
+        #define hhxcbGetOpenGLFunction(Name) Name = (type_##Name *)glXGetProcAddress((const GLubyte*)#Name)
+		hhxcbGetOpenGLFunction(glEnableVertexAttribArray);
+		hhxcbGetOpenGLFunction(glDisableVertexAttribArray);
+		hhxcbGetOpenGLFunction(glGetAttribLocation);
+		hhxcbGetOpenGLFunction(glVertexAttribPointer);
+
 		context->glXSwapInterval =
             (glx_swap_interval_mesa *)glXGetProcAddressARB(
                 (GLubyte *)"glXSwapIntervalMESA");
@@ -2201,6 +2219,9 @@ main()
     u32 MaxVertexCount = 65536;
     platform_memory_block *VertexArrayBlock = hhxcbAllocateMemory(MaxVertexCount*sizeof(textured_vertex), PlatformMemory_NotRestored);
     textured_vertex *VertexArray = (textured_vertex *)VertexArrayBlock->Base;
+
+    platform_memory_block *BitmapArrayBlock = hhxcbAllocateMemory(MaxVertexCount*sizeof(loaded_bitmap *), PlatformMemory_NotRestored);
+    loaded_bitmap **BitmapArray = (loaded_bitmap **)BitmapArrayBlock->Base;
     
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
@@ -2280,7 +2301,8 @@ main()
         game_render_commands RenderCommands = RenderCommandStruct(
             PushBufferSize, PushBuffer,
             buffer.width, buffer.height,
-            MaxVertexCount, VertexArray);
+            MaxVertexCount, VertexArray, BitmapArray,
+            &OpenGL.WhiteBitmap);
         
         hhxcb_window_dimension dimension = hhxcbGetWindowDimension(&context);     
         rectangle2i DrawRegion = AspectRatioFit(
