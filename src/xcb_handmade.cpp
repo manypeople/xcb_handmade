@@ -127,6 +127,8 @@ typedef void type_glEnableVertexAttribArray(GLuint index);
 typedef void type_glDisableVertexAttribArray(GLuint index);
 typedef GLint type_glGetAttribLocation(GLuint program, const GLchar *name);
 typedef void type_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+typedef void (*DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, void *userParam);
+typedef void type_glDebugMessageCallback(DEBUGPROC callback, void * userParam);
 
 #define OpenGLGlobalFunction(Name) global_variable type_##Name *Name;
 
@@ -157,6 +159,7 @@ OpenGLGlobalFunction(glEnableVertexAttribArray);
 OpenGLGlobalFunction(glDisableVertexAttribArray);
 OpenGLGlobalFunction(glGetAttribLocation);
 OpenGLGlobalFunction(glVertexAttribPointer);
+OpenGLGlobalFunction(glDebugMessageCallback);
 
 #include "handmade_render.h"
 #include "handmade_opengl.h"
@@ -1382,6 +1385,18 @@ int hhxcbOpenGLAttribs[] =
     0,
 };
 
+internal void
+hhxcbOpenGLDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, void *userParam)
+{
+    //if((source == GL_DEBUG_SOURCE_API) || (source == GL_DEBUG_SOURCE_WINDOW_SYSTEM))
+    {
+        //if((severity == GL_DEBUG_SEVERITY_MEDIUM) || (severity == GL_DEBUG_SEVERITY_HIGH))
+        {
+            printf("opengl: %s\n", message);
+        }
+    }
+}
+
 internal GLXContext
 hhxcbInitOpenGL(hhxcb_context *context)
 {            
@@ -1505,7 +1520,10 @@ hhxcbInitOpenGL(hhxcb_context *context)
 		hhxcbGetOpenGLFunction(glDisableVertexAttribArray);
 		hhxcbGetOpenGLFunction(glGetAttribLocation);
 		hhxcbGetOpenGLFunction(glVertexAttribPointer);
+        hhxcbGetOpenGLFunction(glDebugMessageCallback);
 
+        glDebugMessageCallback(&hhxcbOpenGLDebugCallback, 0);
+        
 		context->glXSwapInterval =
             (glx_swap_interval_mesa *)glXGetProcAddressARB(
                 (GLubyte *)"glXSwapIntervalMESA");
