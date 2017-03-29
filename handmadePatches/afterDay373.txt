@@ -1,0 +1,39 @@
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index 5307fea..04a7807 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -105,7 +105,7 @@ OpenGLGetInfo(b32 ModernContext)
+         Result.ShadingLanguageVersion = "(none)";
+     }
+ 
+-    Result.Extensions = (char *)glGetString(GL_EXTENSIONS);
++/*    Result.Extensions = (char *)glGetString(GL_EXTENSIONS);
+ 
+     for(char *At = Result.Extensions;
+         *At;
+@@ -126,7 +126,11 @@ OpenGLGetInfo(b32 ModernContext)
+ 
+         At = End;
+     }
+-
++*/
++    Result.GL_EXT_texture_sRGB=true;
++    Result.GL_EXT_framebuffer_sRGB=false;
++    Result.GL_ARB_framebuffer_object=true;
++  
+     char *MajorAt = Result.Version;
+     char *MinorAt = 0;
+     for(char *At = Result.Version;
+diff --git a/code/handmade_world_mode.cpp b/code/handmade_world_mode.cpp
+index 3e3422c..58ed85c 100644
+--- a/code/handmade_world_mode.cpp
++++ b/code/handmade_world_mode.cpp
+@@ -786,7 +786,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
+         if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Left]))
+         {
+             f32 RotationSpeed = 0.001f*Pi32;
+-            WorldMode->DebugCameraOrbit += RotationSpeed*dMouseP.x;
++            WorldMode->DebugCameraOrbit -= RotationSpeed*dMouseP.x;
+             WorldMode->DebugCameraPitch += RotationSpeed*dMouseP.y;
+         }
+         else if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Middle]))
