@@ -127,8 +127,16 @@ typedef void type_glEnableVertexAttribArray(GLuint index);
 typedef void type_glDisableVertexAttribArray(GLuint index);
 typedef GLint type_glGetAttribLocation(GLuint program, const GLchar *name);
 typedef void type_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
-typedef void (*DEBUGPROC)(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, void *userParam);
-typedef void type_glDebugMessageCallback(DEBUGPROC callback, void * userParam);
+typedef void type_glBindVertexArray(GLuint array);
+typedef void type_glGenVertexArrays(GLsizei n, GLuint *arrays);
+typedef void type_glBindBuffer (GLenum target, GLuint buffer);
+typedef void type_glGenBuffers (GLsizei n, GLuint *buffers);
+typedef void type_glBufferData (GLenum target, GLsizeiptr size, const void *data, GLenum usage);
+
+typedef void type_glDebugMessageControl(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
+#define GL_DEBUG_CALLBACK(Name) void Name(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
+typedef GL_DEBUG_CALLBACK(GLDEBUGPROC_MODIFIED);
+typedef void type_glDebugMessageCallbackARB(GLDEBUGPROC_MODIFIED *callback, const void *userParam);
 
 #define OpenGLGlobalFunction(Name) global_variable type_##Name *Name;
 
@@ -159,7 +167,13 @@ OpenGLGlobalFunction(glEnableVertexAttribArray);
 OpenGLGlobalFunction(glDisableVertexAttribArray);
 OpenGLGlobalFunction(glGetAttribLocation);
 OpenGLGlobalFunction(glVertexAttribPointer);
-OpenGLGlobalFunction(glDebugMessageCallback);
+OpenGLGlobalFunction(glDebugMessageControl);
+OpenGLGlobalFunction(glDebugMessageCallbackARB);
+OpenGLGlobalFunction(glBindVertexArray);
+OpenGLGlobalFunction(glGenVertexArrays);
+OpenGLGlobalFunction(glBindBuffer);
+OpenGLGlobalFunction(glGenBuffers);
+OpenGLGlobalFunction(glBufferData);
 
 #include "handmade_render.h"
 #include "handmade_opengl.h"
@@ -1375,27 +1389,15 @@ int hhxcbOpenGLAttribs[] =
 {
     GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
     GLX_CONTEXT_MINOR_VERSION_ARB, 0,
-    GLX_CONTEXT_FLAGS_ARB, 0 // NOTE(casey): Enable for testing WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB
+    GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB
 #if HANDMADE_INTERNAL
     |GLX_CONTEXT_DEBUG_BIT_ARB
 #endif
     ,
-    GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
-//    GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
+//    GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB,
+    GLX_CONTEXT_PROFILE_MASK_ARB, GLX_CONTEXT_CORE_PROFILE_BIT_ARB,
     0,
 };
-
-internal void
-hhxcbOpenGLDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, void *userParam)
-{
-    //if((source == GL_DEBUG_SOURCE_API) || (source == GL_DEBUG_SOURCE_WINDOW_SYSTEM))
-    {
-        //if((severity == GL_DEBUG_SEVERITY_MEDIUM) || (severity == GL_DEBUG_SEVERITY_HIGH))
-        {
-            printf("opengl: %s\n", message);
-        }
-    }
-}
 
 internal GLXContext
 hhxcbInitOpenGL(hhxcb_context *context)
@@ -1520,10 +1522,14 @@ hhxcbInitOpenGL(hhxcb_context *context)
 		hhxcbGetOpenGLFunction(glDisableVertexAttribArray);
 		hhxcbGetOpenGLFunction(glGetAttribLocation);
 		hhxcbGetOpenGLFunction(glVertexAttribPointer);
-        hhxcbGetOpenGLFunction(glDebugMessageCallback);
+        hhxcbGetOpenGLFunction(glDebugMessageControl);
+        hhxcbGetOpenGLFunction(glDebugMessageCallbackARB);
+		hhxcbGetOpenGLFunction(glBindVertexArray);
+		hhxcbGetOpenGLFunction(glGenVertexArrays);
+		hhxcbGetOpenGLFunction(glBindBuffer);
+		hhxcbGetOpenGLFunction(glGenBuffers);
+		hhxcbGetOpenGLFunction(glBufferData);
 
-        glDebugMessageCallback(&hhxcbOpenGLDebugCallback, 0);
-        
 		context->glXSwapInterval =
             (glx_swap_interval_mesa *)glXGetProcAddressARB(
                 (GLubyte *)"glXSwapIntervalMESA");
