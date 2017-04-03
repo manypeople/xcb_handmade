@@ -138,6 +138,8 @@ typedef void type_glDebugMessageControl(GLenum source, GLenum type, GLenum sever
 typedef GL_DEBUG_CALLBACK(GLDEBUGPROC_MODIFIED);
 typedef void type_glDebugMessageCallbackARB(GLDEBUGPROC_MODIFIED *callback, const void *userParam);
 
+typedef const GLubyte *type_glGetStringi(GLenum name, GLuint index);
+
 #define OpenGLGlobalFunction(Name) global_variable type_##Name *Name;
 
 
@@ -174,6 +176,7 @@ OpenGLGlobalFunction(glGenVertexArrays);
 OpenGLGlobalFunction(glBindBuffer);
 OpenGLGlobalFunction(glGenBuffers);
 OpenGLGlobalFunction(glBufferData);
+OpenGLGlobalFunction(glGetStringi);
 
 #include "handmade_render.h"
 #include "handmade_opengl.h"
@@ -1488,6 +1491,20 @@ hhxcbInitOpenGL(hhxcb_context *context)
             // NOTE(casey): This is an antiquated version of OpenGL
         }
 
+#define hhxcbGetOpenGLFunction(Name) Name = (type_##Name *)glXGetProcAddress((const GLubyte*)#Name)
+		hhxcbGetOpenGLFunction(glEnableVertexAttribArray);
+		hhxcbGetOpenGLFunction(glDisableVertexAttribArray);
+		hhxcbGetOpenGLFunction(glGetAttribLocation);
+		hhxcbGetOpenGLFunction(glVertexAttribPointer);
+        hhxcbGetOpenGLFunction(glDebugMessageControl);
+        hhxcbGetOpenGLFunction(glDebugMessageCallbackARB);
+		hhxcbGetOpenGLFunction(glBindVertexArray);
+		hhxcbGetOpenGLFunction(glGenVertexArrays);
+		hhxcbGetOpenGLFunction(glBindBuffer);
+		hhxcbGetOpenGLFunction(glGenBuffers);
+		hhxcbGetOpenGLFunction(glBufferData);
+        hhxcbGetOpenGLFunction(glGetStringi);
+        
         // NOTE: this function also turns srgb on if it is supported
         opengl_info Info = OpenGLGetInfo(ModernContext);
         if(Info.GL_ARB_framebuffer_object)
@@ -1516,19 +1533,7 @@ hhxcbInitOpenGL(hhxcb_context *context)
         glUniform4fv = (gl_uniform_4fv *)glXGetProcAddress((const GLubyte*)"glUniform4fv");
         glUniformMatrix4fv = (gl_uniform_matrix_4fv *)glXGetProcAddress((const GLubyte*)"glUniformMatrix4fv");
         glUniform1i = (gl_uniform_1i *)glXGetProcAddress((const GLubyte*)"glUniform1i");
-
-        #define hhxcbGetOpenGLFunction(Name) Name = (type_##Name *)glXGetProcAddress((const GLubyte*)#Name)
-		hhxcbGetOpenGLFunction(glEnableVertexAttribArray);
-		hhxcbGetOpenGLFunction(glDisableVertexAttribArray);
-		hhxcbGetOpenGLFunction(glGetAttribLocation);
-		hhxcbGetOpenGLFunction(glVertexAttribPointer);
-        hhxcbGetOpenGLFunction(glDebugMessageControl);
-        hhxcbGetOpenGLFunction(glDebugMessageCallbackARB);
-		hhxcbGetOpenGLFunction(glBindVertexArray);
-		hhxcbGetOpenGLFunction(glGenVertexArrays);
-		hhxcbGetOpenGLFunction(glBindBuffer);
-		hhxcbGetOpenGLFunction(glGenBuffers);
-		hhxcbGetOpenGLFunction(glBufferData);
+        
 
 		context->glXSwapInterval =
             (glx_swap_interval_mesa *)glXGetProcAddressARB(
