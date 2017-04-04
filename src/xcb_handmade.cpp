@@ -123,6 +123,11 @@ typedef GLint gl_get_uniform_location (GLuint program, const GLchar *name);
 typedef void gl_uniform_4fv(GLint location, GLsizei count, const GLfloat *value);
 typedef void gl_uniform_matrix_4fv(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value);
 typedef void gl_uniform_1i(GLint location, GLint v0);
+
+typedef void type_glUniform1f(GLint location, GLfloat v0);
+typedef void type_glUniform2fv(GLint location, GLsizei count, const GLfloat *value);
+typedef void type_glUniform3fv(GLint location, GLsizei count, const GLfloat *value);
+
 typedef void type_glEnableVertexAttribArray(GLuint index);
 typedef void type_glDisableVertexAttribArray(GLuint index);
 typedef GLint type_glGetAttribLocation(GLuint program, const GLchar *name);
@@ -165,6 +170,9 @@ global_variable gl_uniform_4fv *glUniform4fv;
 global_variable gl_uniform_matrix_4fv *glUniformMatrix4fv;
 global_variable gl_uniform_1i *glUniform1i;
 
+OpenGLGlobalFunction(glUniform1f);
+OpenGLGlobalFunction(glUniform2fv);
+OpenGLGlobalFunction(glUniform3fv);
 OpenGLGlobalFunction(glEnableVertexAttribArray);
 OpenGLGlobalFunction(glDisableVertexAttribArray);
 OpenGLGlobalFunction(glGetAttribLocation);
@@ -1504,6 +1512,10 @@ hhxcbInitOpenGL(hhxcb_context *context)
 		hhxcbGetOpenGLFunction(glGenBuffers);
 		hhxcbGetOpenGLFunction(glBufferData);
         hhxcbGetOpenGLFunction(glGetStringi);
+
+        hhxcbGetOpenGLFunction(glUniform1f);
+        hhxcbGetOpenGLFunction(glUniform2fv);
+        hhxcbGetOpenGLFunction(glUniform3fv);
         
         // NOTE: this function also turns srgb on if it is supported
         opengl_info Info = OpenGLGetInfo(ModernContext);
@@ -1577,8 +1589,6 @@ hhxcbDisplayBufferInWindow(hhxcb_context *context,
 {
     temporary_memory TempMem = BeginTemporaryMemory(TempArena);
     
-    game_render_prep Prep = PrepForRender(Commands, TempArena);
-    
 /*  TODO(casey): Do we want to check for resources like before?  Probably? 
     if(AllResourcesPresent(RenderGroup))
     {
@@ -1595,7 +1605,7 @@ hhxcbDisplayBufferInWindow(hhxcb_context *context,
 		OutputTarget.Height = buffer->height;
         OutputTarget.Pitch = buffer->pitch;
 
-        SoftwareRenderCommands(RenderQueue, Commands, &Prep, &OutputTarget, TempArena);
+        SoftwareRenderCommands(RenderQueue, Commands, &OutputTarget, TempArena);
 
         OpenGLDisplayBitmap(buffer->width,
                             buffer->height,
@@ -1610,7 +1620,7 @@ hhxcbDisplayBufferInWindow(hhxcb_context *context,
 	else
 	{
         BEGIN_BLOCK("OpenGLRenderCommands");
-		OpenGLRenderCommands(Commands, &Prep, DrawRegion, windowWidth, windowHeight);
+		OpenGLRenderCommands(Commands, DrawRegion, windowWidth, windowHeight);
         END_BLOCK();
         
         BEGIN_BLOCK("SwapBuffers");
