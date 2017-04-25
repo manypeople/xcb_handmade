@@ -629,7 +629,7 @@ DEBUG_PLATFORM_GET_MEMORY_STATS(hhxcbGetMemoryStats)
         SourceBlock != Sentinel;
         SourceBlock = SourceBlock->Next)
     {
-        Assert(SourceBlock->Block.Size <= U32Maximum);
+        Assert(SourceBlock->Block.Size <= U32Max);
         
         ++Stats.BlockCount;
         Stats.TotalSize += SourceBlock->Block.Size;
@@ -651,7 +651,7 @@ hhxcbVerifyMemoryListIntegrity(void)
         SourceBlock != Sentinel;
         SourceBlock = SourceBlock->Next)
     {
-        Assert(SourceBlock->Block.Size <= U32Maximum);
+        Assert(SourceBlock->Block.Size <= U32Max);
     }
     ++FailCounter;
     if(FailCounter == 35)
@@ -686,7 +686,7 @@ hhxcb_start_recording(hhxcb_state *state, uint8 index)
                 DestBlock.BasePointer = (u64)BasePointer;
                 DestBlock.Size = SourceBlock->Block.Size;
                 write(state->recording_fd, &DestBlock, sizeof(DestBlock));
-                Assert(DestBlock.Size <= U32Maximum);
+                Assert(DestBlock.Size <= U32Max);
                 write(state->recording_fd, BasePointer, (u32)DestBlock.Size);
             }
         }
@@ -759,7 +759,7 @@ hhxcb_start_playback(hhxcb_state *state, uint8 index)
             if(Block.BasePointer != 0)
             {
                 void *BasePointer = (void *)Block.BasePointer;
-                Assert(Block.Size <= U32Maximum);
+                Assert(Block.Size <= U32Max);
                 read(state->playback_fd, BasePointer, (u32)Block.Size);
             }
             else
