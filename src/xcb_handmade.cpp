@@ -69,6 +69,7 @@
 #include <xcb/xcb_keysyms.h>
 
 #include <xcb/randr.h> // get monitor resolution for fullscreen
+#include "X11/extensions/Xrandr.h"
 
 #include <X11/keysym.h>
 #include <X11/XF86keysym.h>
@@ -1128,12 +1129,15 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                     r32 MouseX = (r32)e->x;
                     // NOTE: X11 window has 0,0 position in upper left
                     // corner, windows has 0,0 in lower left
+                    // NOTE: assumes window height is the same as the
+                    // buffer height
+                    //printf("height: %d x: %d y: %d modY: %d\n", buffer->height, e->x, e->y, (buffer->height - e->y));
                     r32 MouseY = (r32)(buffer->height - e->y);
                             
                     r32 MouseU = Clamp01MapToRange((r32)DrawRegion->MinX, MouseX, (r32)DrawRegion->MaxX);
                     r32 MouseV = Clamp01MapToRange((r32)DrawRegion->MinY, MouseY, (r32)DrawRegion->MaxY);
                             
-                     new_input->MouseX = (r32)RenderCommands->Width*MouseU;
+                    new_input->MouseX = (r32)RenderCommands->Width*MouseU;
                     new_input->MouseY = (r32)RenderCommands->Height*MouseV;
 
                     break;
@@ -1546,7 +1550,6 @@ hhxcbInitOpenGL(hhxcb_context *context)
         glUniformMatrix4fv = (gl_uniform_matrix_4fv *)glXGetProcAddress((const GLubyte*)"glUniformMatrix4fv");
         glUniform1i = (gl_uniform_1i *)glXGetProcAddress((const GLubyte*)"glUniform1i");
         
-
 		context->glXSwapInterval =
             (glx_swap_interval_mesa *)glXGetProcAddressARB(
                 (GLubyte *)"glXSwapIntervalMESA");
@@ -2154,10 +2157,6 @@ main()
     xcb_screen_t *screen = iter.data;
     context.fmt = hhxcb_find_format(&context, 32, 24, 32);
 
-    int monitor_refresh_hz = 60;
-    real32 game_update_hz = monitor_refresh_hz; // Should almost always be an int...
-    long target_nanoseconds_per_frame = (1000 * 1000 * 1000) / game_update_hz;
-
     uint32_t mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
     uint32_t values[2] =
     {
@@ -2233,6 +2232,14 @@ main()
 	sem_t LowQueueSemaphoreHandle = {};
 	platform_work_queue LowPriorityQueue = {};
 	hhxcbMakeQueue(&LowPriorityQueue, &LowQueueSemaphoreHandle, ArrayCount(LowPriStartups), LowPriStartups);
+    
+    int monitor_refresh_hz = 60;
+    _XRRScreenConfiguration *conf = XRRGetScreenInfo(context.display, screen->root);
+    if(conf->current_rate > 0)
+    {
+        monitor_refresh_hz = conf->current_rate;
+    }
+    f32 game_update_hz = monitor_refresh_hz; // Should almost always be an int...
     
     hhxcb_sound_output sound_output = {};
     sound_output.samples_per_second = 48000;
@@ -2314,9 +2321,15 @@ main()
     game_input *old_input = &input[1];
 
     int64_t next_controller_refresh = 0;
-	
+
+    u32 ExpectedFramesPerUpdate = 1;
+    f32 TargetSecondsPerFrame = (f32)ExpectedFramesPerUpdate / (f32)game_update_hz;	
+    u64 target_nanoseconds_per_frame = (1000 * 1000 * 1000)*TargetSecondsPerFrame;
     while(!context.ending_flag)
     {
+        {DEBUG_DATA_BLOCK("Platform");
+            DEBUG_VALUE(ExpectedFramesPerUpdate);
+        }
         // NOTE: alsa doesn't give access to the write/play cursor to do
         // proper audio debugging
         {DEBUG_DATA_BLOCK("Platform/Controls");
@@ -2329,7 +2342,7 @@ main()
 		//
 
         // NOTE: seconds per frame
-        new_input->dtForFrame = target_nanoseconds_per_frame / (1000.0 * 1000.0 * 1000.0);
+        new_input->dtForFrame = TargetSecondsPerFrame;
 
         //
         //
@@ -2624,7 +2637,15 @@ main()
 		END_BLOCK();
 		
         timespec end_counter = hhxcbGetWallClock();
-		FRAME_MARKER(hhxcbGetSecondsElapsed(last_counter, end_counter));
+        f32 MeasuredSecondsPerFrame = hhxcbGetSecondsElapsed(last_counter, end_counter);
+        f32 ExactTargetFramesPerUpdate = MeasuredSecondsPerFrame*(f32)monitor_refresh_hz;
+        u32 NewExpectedFramesPerUpdate = RoundReal32ToInt32(ExactTargetFramesPerUpdate);
+        ExpectedFramesPerUpdate = NewExpectedFramesPerUpdate;
+                    
+        TargetSecondsPerFrame = MeasuredSecondsPerFrame;
+        target_nanoseconds_per_frame = (1000 * 1000 * 1000)*TargetSecondsPerFrame;
+
+        FRAME_MARKER(MeasuredSecondsPerFrame);
         last_counter = end_counter;
     }
 

@@ -25,6 +25,26 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+// NOTE: this is the struct returned by XRRGetScreenInfo, containing
+// information xrandr knows about, it is included here because the X11
+// people think it is a good idea to hide this information from the
+// programmer by putting it in a private header file, "Xrandrint.h".
+struct _XRRScreenConfiguration
+{
+    Screen *screen;	/* the root window in GetScreenInfo */
+    XRRScreenSize *sizes;
+    Rotation rotations;
+    Rotation current_rotation;
+    int nsizes;
+    int current_size;
+    short current_rate;
+    Time timestamp;
+    Time config_timestamp;
+    int subpixel_order;	/* introduced in randr v0.1 */
+    short *rates;		/* introduced in randr v1.1 */
+    int nrates;
+};
+
 #define HHXCB_STATE_FILE_NAME_LENGTH (1024)
 #define HHXCB_CLOCK CLOCK_MONOTONIC
 #define HHXCB_MAX_CONTROLLERS 4
