@@ -1,0 +1,49 @@
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index f203a40..8c23757 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -394,11 +394,17 @@ UseProgramBegin(opengl_program_common *Prog)
+     GLuint UVArray = Prog->VertUVID;
+     
+     glEnableVertexAttribArray(PArray);
+-    glEnableVertexAttribArray(CArray);
++    if(CArray != -1)
++    {
++        glEnableVertexAttribArray(CArray);
++    }
+     glEnableVertexAttribArray(UVArray);
+     
+     glVertexAttribPointer(UVArray, 2, GL_FLOAT, false, sizeof(textured_vertex), (void *)OffsetOf(textured_vertex, UV));
+-    glVertexAttribPointer(CArray, 4, GL_UNSIGNED_BYTE, true, sizeof(textured_vertex), (void *)OffsetOf(textured_vertex, Color));
++    if(CArray != -1)
++    {
++        glVertexAttribPointer(CArray, 4, GL_UNSIGNED_BYTE, true, sizeof(textured_vertex), (void *)OffsetOf(textured_vertex, Color));
++    }
+     glVertexAttribPointer(PArray, 4, GL_FLOAT, false, sizeof(textured_vertex), (void *)OffsetOf(textured_vertex, P));
+ }
+ 
+@@ -412,7 +418,10 @@ UseProgramEnd(opengl_program_common *Prog)
+     GLuint UVArray = Prog->VertUVID;
+     
+     glDisableVertexAttribArray(PArray);
+-    glDisableVertexAttribArray(CArray);
++    if(CArray != -1)
++    {
++        glDisableVertexAttribArray(CArray);
++    }
+     glDisableVertexAttribArray(UVArray);
+ }
+ 
+diff --git a/code/handmade_world_mode.cpp b/code/handmade_world_mode.cpp
+index 972fcbe..dae5ad5 100644
+--- a/code/handmade_world_mode.cpp
++++ b/code/handmade_world_mode.cpp
+@@ -794,7 +794,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
+         if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Left]))
+         {
+             f32 RotationSpeed = 0.001f*Pi32;
+-            WorldMode->DebugCameraOrbit += RotationSpeed*dMouseP.x;
++            WorldMode->DebugCameraOrbit -= RotationSpeed*dMouseP.x;
+             WorldMode->DebugCameraPitch += RotationSpeed*dMouseP.y;
+         }
+         else if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Middle]))
