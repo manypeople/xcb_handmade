@@ -2175,11 +2175,17 @@ main()
 		,
     };
 
+#define START_WIDTH 192
+#define START_HEIGHT 108
+
+//#define START_WIDTH 480
+//#define START_HEIGHT 270
+
 //#define START_WIDTH 960
 //#define START_HEIGHT 540
 
-#define START_WIDTH 1920
-#define START_HEIGHT 1080
+//#define START_WIDTH 1920
+//#define START_HEIGHT 1080
 
 //#define START_WIDTH 1279
 //#define START_HEIGHT 719
