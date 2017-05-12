@@ -138,6 +138,9 @@ typedef void type_glGenVertexArrays(GLsizei n, GLuint *arrays);
 typedef void type_glBindBuffer (GLenum target, GLuint buffer);
 typedef void type_glGenBuffers (GLsizei n, GLuint *buffers);
 typedef void type_glBufferData (GLenum target, GLsizeiptr size, const void *data, GLenum usage);
+typedef void type_glDeleteProgram (GLuint program);
+typedef void type_glDeleteShader (GLuint shader);
+typedef void type_glDeleteFramebuffers (GLsizei n, const GLuint *framebuffers);
 
 typedef void type_glDebugMessageControl(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
 #define GL_DEBUG_CALLBACK(Name) void Name(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
@@ -186,6 +189,9 @@ OpenGLGlobalFunction(glBindBuffer);
 OpenGLGlobalFunction(glGenBuffers);
 OpenGLGlobalFunction(glBufferData);
 OpenGLGlobalFunction(glGetStringi);
+OpenGLGlobalFunction(glDeleteProgram);
+OpenGLGlobalFunction(glDeleteShader);
+OpenGLGlobalFunction(glDeleteFramebuffers);
 
 #include "handmade_render.h"
 #include "handmade_opengl.h"
@@ -1137,8 +1143,8 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                     r32 MouseU = Clamp01MapToRange((r32)DrawRegion->MinX, MouseX, (r32)DrawRegion->MaxX);
                     r32 MouseV = Clamp01MapToRange((r32)DrawRegion->MinY, MouseY, (r32)DrawRegion->MaxY);
                             
-                    new_input->MouseX = (r32)RenderCommands->Width*MouseU;
-                    new_input->MouseY = (r32)RenderCommands->Height*MouseV;
+                    new_input->MouseX = (r32)RenderCommands->Settings.Width*MouseU;
+                    new_input->MouseY = (r32)RenderCommands->Settings.Height*MouseV;
 
                     break;
                 }
@@ -1519,6 +1525,9 @@ hhxcbInitOpenGL(hhxcb_context *context)
 		hhxcbGetOpenGLFunction(glGenBuffers);
 		hhxcbGetOpenGLFunction(glBufferData);
         hhxcbGetOpenGLFunction(glGetStringi);
+        hhxcbGetOpenGLFunction(glDeleteProgram);
+        hhxcbGetOpenGLFunction(glDeleteShader);
+        hhxcbGetOpenGLFunction(glDeleteFramebuffers);
 
         hhxcbGetOpenGLFunction(glUniform1f);
         hhxcbGetOpenGLFunction(glUniform2fv);
@@ -2175,8 +2184,8 @@ main()
 		,
     };
 
-#define START_WIDTH 192
-#define START_HEIGHT 108
+//#define START_WIDTH 192
+//#define START_HEIGHT 108
 
 //#define START_WIDTH 480
 //#define START_HEIGHT 270
@@ -2184,8 +2193,8 @@ main()
 //#define START_WIDTH 960
 //#define START_HEIGHT 540
 
-//#define START_WIDTH 1920
-//#define START_HEIGHT 1080
+#define START_WIDTH 1920
+#define START_HEIGHT 1080
 
 //#define START_WIDTH 1279
 //#define START_HEIGHT 719
@@ -2277,7 +2286,13 @@ main()
 
     platform_memory_block *BitmapArrayBlock = hhxcbAllocateMemory(MaxVertexCount*sizeof(loaded_bitmap *), PlatformMemory_NotRestored);
     loaded_bitmap **BitmapArray = (loaded_bitmap **)BitmapArrayBlock->Base;
-    
+
+    game_render_commands RenderCommands = DefaultRenderCommands(
+        PushBufferSize, PushBuffer,
+        buffer.width, buffer.height,
+        MaxVertexCount, VertexArray, BitmapArray,
+        &OpenGL.WhiteBitmap);
+        
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
     game_memory m = {};
@@ -2358,16 +2373,10 @@ main()
         //
 
 		BEGIN_BLOCK("InputProcessing");
-
-        game_render_commands RenderCommands = RenderCommandStruct(
-            PushBufferSize, PushBuffer,
-            buffer.width, buffer.height,
-            MaxVertexCount, VertexArray, BitmapArray,
-            &OpenGL.WhiteBitmap);
         
         hhxcb_window_dimension dimension = hhxcbGetWindowDimension(&context);     
         rectangle2i DrawRegion = AspectRatioFit(
-            RenderCommands.Width, RenderCommands.Height,
+            RenderCommands.Settings.Width, RenderCommands.Settings.Height,
             dimension.width, dimension.height);
                 
         if (last_counter.tv_sec >= next_controller_refresh)
@@ -2638,7 +2647,10 @@ main()
                                    &HighPriorityQueue, &RenderCommands,
                                    DrawRegion, dimension.width,
                                    dimension.height, &FrameTempArena);
-		
+
+        RenderCommands.PushBufferDataAt = RenderCommands.PushBufferBase;
+        RenderCommands.VertexCount = 0;
+        
         game_input *temp_input = new_input;
         new_input = old_input;
         old_input = temp_input;
