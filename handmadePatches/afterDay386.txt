@@ -1,0 +1,53 @@
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index a2ba875..5f9c0b7 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -611,7 +611,7 @@ CompileZBiasProgram(zbias_program *Result, b32x DepthPeel)
+ {
+     char Defines[1024];
+     FormatString(sizeof(Defines), Defines,
+-                 "#version 130\n"
++                 "#version 150\n"
+                  "#define ShaderSimTexWriteSRGB %d\n"
+                  "#define ShaderSimTexReadSRGB %d\n"
+                  "#define DepthPeel %d\n",
+@@ -731,7 +731,7 @@ CompilePeelComposite(peel_composite_program *Result)
+ {
+     char Defines[1024];
+     FormatString(sizeof(Defines), Defines,
+-                 "#version 130\n"
++                 "#version 150\n"
+                  "#define ShaderSimTexWriteSRGB %d\n"
+                  "#define ShaderSimTexReadSRGB %d\n"
+                  "#define DepthPeel %d\n",
+@@ -816,7 +816,7 @@ CompileResolveMultisample(resolve_multisample_program *Result)
+ {
+     char Defines[1024];
+     FormatString(sizeof(Defines), Defines,
+-                 "#version 130\n"
++                 "#version 150\n"
+                  "#define ShaderSimTexWriteSRGB %d\n"
+                  "#define ShaderSimTexReadSRGB %d\n"
+                  "#define DepthPeel %d\n",
+@@ -887,7 +887,7 @@ CompileFinalStretch(final_stretch_program *Result)
+ {
+     char Defines[1024];
+     FormatString(sizeof(Defines), Defines,
+-                 "#version 130\n"
++                 "#version 150\n"
+                  "#define ShaderSimTexWriteSRGB %d\n"
+                  "#define ShaderSimTexReadSRGB %d\n",
+                  OpenGL.ShaderSimTexWriteSRGB,
+diff --git a/code/handmade_world_mode.cpp b/code/handmade_world_mode.cpp
+index 972fcbe..dae5ad5 100644
+--- a/code/handmade_world_mode.cpp
++++ b/code/handmade_world_mode.cpp
+@@ -794,7 +794,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
+         if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Left]))
+         {
+             f32 RotationSpeed = 0.001f*Pi32;
+-            WorldMode->DebugCameraOrbit += RotationSpeed*dMouseP.x;
++            WorldMode->DebugCameraOrbit -= RotationSpeed*dMouseP.x;
+             WorldMode->DebugCameraPitch += RotationSpeed*dMouseP.y;
+         }
+         else if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Middle]))
