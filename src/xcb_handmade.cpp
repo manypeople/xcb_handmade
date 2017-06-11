@@ -994,7 +994,7 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
     }
 
     {
-        TIMED_BLOCK("hhxcb Message/Keyboard/Mouse Processing");
+        TIMED_BLOCK("hhxcb Message/Keyboard Processing");
         
         XEvent event;
         for(;;)
@@ -1128,6 +1128,9 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                     // No idea what these are, but they're spamming me.
                     break;
                 }
+#if 0
+                // NOTE: using this event to get mouse position seems to
+                // be unreliable
                 case MotionNotify:
                 {
                     XMotionEvent *e = (XMotionEvent *)&event;
@@ -1139,7 +1142,7 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                     // buffer height
                     //printf("height: %d x: %d y: %d modY: %d\n", buffer->height, e->x, e->y, (buffer->height - e->y));
                     r32 MouseY = (r32)(buffer->height - e->y);
-                            
+
                     r32 MouseU = Clamp01MapToRange((r32)DrawRegion->MinX, MouseX, (r32)DrawRegion->MaxX);
                     r32 MouseV = Clamp01MapToRange((r32)DrawRegion->MinY, MouseY, (r32)DrawRegion->MaxY);
                             
@@ -1148,6 +1151,7 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
 
                     break;
                 }
+#endif
                 case ClientMessage:
                 {
                     XClientMessageEvent *client_message_event = (XClientMessageEvent *)&event;
@@ -2174,7 +2178,7 @@ main()
     {
         screen->black_pixel, //0x0000ffff,
         0
-		| XCB_EVENT_MASK_POINTER_MOTION
+		//| XCB_EVENT_MASK_POINTER_MOTION
 		| XCB_EVENT_MASK_KEY_PRESS
 		| XCB_EVENT_MASK_KEY_RELEASE
 		| XCB_EVENT_MASK_BUTTON_PRESS
@@ -2391,6 +2395,27 @@ main()
         hhxcb_process_events(&context, state, &buffer, &RenderCommands,
                              &DrawRegion, new_input, old_input);
 
+        if(!GlobalPause)
+        {
+            TIMED_BLOCK("Mouse Position");
+            Window rootWindow;
+            Window childWindow;
+            s32 rootX;
+            s32 rootY;
+            s32 MouseX;
+            s32 InvMouseY;
+            u32 maskState;
+            XQueryPointer(context.display, context.window, &rootWindow, &childWindow, &rootX, &rootY, &MouseX, &InvMouseY, &maskState);
+            s32 MouseY = dimension.height - InvMouseY;
+            //printf("mouseX: %d mouseY: %d dimension.height: %d\n", MouseX, MouseY, dimension.height);
+                    
+            r32 MouseU = Clamp01MapToRange((r32)DrawRegion.MinX, MouseX, (r32)DrawRegion.MaxX);
+            r32 MouseV = Clamp01MapToRange((r32)DrawRegion.MinY, MouseY, (r32)DrawRegion.MaxY);
+                            
+            new_input->MouseX = (r32)RenderCommands.Settings.Width*MouseU;
+            new_input->MouseY = (r32)RenderCommands.Settings.Height*MouseV;
+        }
+        
 		END_BLOCK();
 
 		//
