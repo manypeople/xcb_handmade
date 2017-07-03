@@ -141,6 +141,7 @@ typedef void type_glBufferData (GLenum target, GLsizeiptr size, const void *data
 typedef void type_glDeleteProgram (GLuint program);
 typedef void type_glDeleteShader (GLuint shader);
 typedef void type_glDeleteFramebuffers (GLsizei n, const GLuint *framebuffers);
+typedef void type_glDrawBuffers (GLsizei n, const GLenum *bufs);
 
 typedef void type_glDebugMessageControl(GLenum source, GLenum type, GLenum severity, GLsizei count, const GLuint *ids, GLboolean enabled);
 #define GL_DEBUG_CALLBACK(Name) void Name(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam)
@@ -192,6 +193,7 @@ OpenGLGlobalFunction(glGetStringi);
 OpenGLGlobalFunction(glDeleteProgram);
 OpenGLGlobalFunction(glDeleteShader);
 OpenGLGlobalFunction(glDeleteFramebuffers);
+OpenGLGlobalFunction(glDrawBuffers);
 
 #include "handmade_render.h"
 #include "handmade_opengl.h"
@@ -1109,6 +1111,34 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                             }
                         }
                     }
+                    else if(keysym == XK_equal)
+                    {
+                        if(is_down)
+                        {
+                            if(context->modifier_keys[MOD_SHIFT].EndedDown)
+                            {
+                                OpenGL.DebugLightBufferTexIndex += 1;
+                            }
+                            else
+                            {
+                                OpenGL.DebugLightBufferIndex += 1;
+                            }
+                        }
+                    }
+                    else if(keysym == XK_minus)
+                    {
+                        if(is_down)
+                        {
+                            if(context->modifier_keys[MOD_SHIFT].EndedDown)
+                            {
+                                OpenGL.DebugLightBufferTexIndex -= 1;
+                            }
+                            else
+                            {
+                                OpenGL.DebugLightBufferIndex -= 1;
+                            }
+                        }
+                    }
                     break;
                 }
                 case ButtonPress:
@@ -1532,6 +1562,7 @@ hhxcbInitOpenGL(hhxcb_context *context)
         hhxcbGetOpenGLFunction(glDeleteProgram);
         hhxcbGetOpenGLFunction(glDeleteShader);
         hhxcbGetOpenGLFunction(glDeleteFramebuffers);
+        hhxcbGetOpenGLFunction(glDrawBuffers);
 
         hhxcbGetOpenGLFunction(glUniform1f);
         hhxcbGetOpenGLFunction(glUniform2fv);
