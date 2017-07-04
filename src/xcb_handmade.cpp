@@ -1443,7 +1443,7 @@ void hhxcb_init_alsa(hhxcb_context *context, hhxcb_sound_output *soundOutput)
 int hhxcbOpenGLAttribs[] =
 {
     GLX_CONTEXT_MAJOR_VERSION_ARB, 3,
-    GLX_CONTEXT_MINOR_VERSION_ARB, 0,
+    GLX_CONTEXT_MINOR_VERSION_ARB, 3,
     GLX_CONTEXT_FLAGS_ARB, GLX_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB
 #if HANDMADE_INTERNAL
     |GLX_CONTEXT_DEBUG_BIT_ARB
