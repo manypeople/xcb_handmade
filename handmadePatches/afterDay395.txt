@@ -1,0 +1,55 @@
+diff --git a/code/handmade_opengl.cpp b/code/handmade_opengl.cpp
+index 6c2cc77..1e27f92 100644
+--- a/code/handmade_opengl.cpp
++++ b/code/handmade_opengl.cpp
+@@ -1572,13 +1572,13 @@ OpenGLChangeToSettings(game_render_settings *Settings)
+         // and probably use sRGB8 for surface color?
+         // And NPTex could probably be encoded in RGB8?
+         Buf->FrontEmitTex = FramebufferTexImage(
+-            GL_TEXTURE_2D, TexWidth, TexHeight, FilterType, GL_RGB32F);
++            GL_TEXTURE_2D, TexWidth, TexHeight, FilterType, GL_RGBA32F);
+         Buf->BackEmitTex = FramebufferTexImage(
+-            GL_TEXTURE_2D, TexWidth, TexHeight, FilterType, GL_RGB32F);
++            GL_TEXTURE_2D, TexWidth, TexHeight, FilterType, GL_RGBA32F);
+         Buf->SurfaceColorTex = FramebufferTexImage(
+-            GL_TEXTURE_2D, TexWidth, TexHeight, FilterType, GL_RGB32F);
++            GL_TEXTURE_2D, TexWidth, TexHeight, FilterType, GL_RGBA32F);
+         Buf->NPTex = FramebufferTexImage(
+-            GL_TEXTURE_2D, TexWidth, TexHeight, FilterType, GL_RGB32F);
++            GL_TEXTURE_2D, TexWidth, TexHeight, FilterType, GL_RGBA32F);
+         
+         // NOTE(casey): "Up" framebuffer
+         GLenum DumbSequence[] = {
+@@ -1994,9 +1994,10 @@ OpenGLRenderCommands(game_render_commands *Commands,
+ #if 1
+     if(DebugSetup)
+     {
++        glDisable(GL_SCISSOR_TEST);
+         FakeSeedLighting(DebugSetup);
+         ComputeLightTransport();
+-        
++
+         OpenGL.DebugLightBufferIndex = Clamp(0, OpenGL.DebugLightBufferIndex, OpenGL.LightBufferCount - 1);
+         OpenGL.DebugLightBufferTexIndex = Clamp(0, OpenGL.DebugLightBufferTexIndex, 3);
+         
+@@ -2010,6 +2011,7 @@ OpenGLRenderCommands(game_render_commands *Commands,
+                           DrawRegion.MaxX, DrawRegion.MaxY,
+                           GL_COLOR_BUFFER_BIT,
+                           GL_NEAREST);
++        glEnable(GL_SCISSOR_TEST);
+     }
+     glReadBuffer(GL_COLOR_ATTACHMENT0);
+ #endif
+diff --git a/code/handmade_world_mode.cpp b/code/handmade_world_mode.cpp
+index 951b053..96de998 100644
+--- a/code/handmade_world_mode.cpp
++++ b/code/handmade_world_mode.cpp
+@@ -794,7 +794,7 @@ UpdateAndRenderWorld(game_state *GameState, game_mode_world *WorldMode, transien
+         if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Left]))
+         {
+             f32 RotationSpeed = 0.001f*Pi32;
+-            WorldMode->DebugCameraOrbit += RotationSpeed*dMouseP.x;
++            WorldMode->DebugCameraOrbit -= RotationSpeed*dMouseP.x;
+             WorldMode->DebugCameraPitch += RotationSpeed*dMouseP.y;
+         }
+         else if(Input->AltDown && IsDown(Input->MouseButtons[PlatformMouseButton_Middle]))
