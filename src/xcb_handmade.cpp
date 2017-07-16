@@ -1117,11 +1117,11 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                         {
                             if(context->modifier_keys[MOD_SHIFT].EndedDown)
                             {
-                                OpenGL.DebugLightBufferTexIndex += 1;
+                                OpenGL.DebugLightBufferIndex += 1;
                             }
                             else
-                            {
-                                OpenGL.DebugLightBufferIndex += 1;
+                            {   
+                                OpenGL.DebugLightBufferTexIndex += 1;
                             }
                         }
                     }
@@ -1131,11 +1131,11 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                         {
                             if(context->modifier_keys[MOD_SHIFT].EndedDown)
                             {
-                                OpenGL.DebugLightBufferTexIndex -= 1;
+                                OpenGL.DebugLightBufferIndex -= 1;
                             }
                             else
                             {
-                                OpenGL.DebugLightBufferIndex -= 1;
+                                OpenGL.DebugLightBufferTexIndex -= 1;
                             }
                         }
                     }
