@@ -2222,11 +2222,11 @@ main()
 //#define START_WIDTH 192
 //#define START_HEIGHT 108
 
-#define START_WIDTH 480
-#define START_HEIGHT 270
+//#define START_WIDTH 480
+//#define START_HEIGHT 270
 
-//#define START_WIDTH 960
-//#define START_HEIGHT 540
+#define START_WIDTH 960
+#define START_HEIGHT 540
 
 //#define START_WIDTH 1280
 //#define START_HEIGHT 720
