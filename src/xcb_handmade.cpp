@@ -1139,6 +1139,13 @@ hhxcb_process_events(hhxcb_context *context, hhxcb_state *state, hhxcb_offscreen
                             }
                         }
                     }
+                    else if((keysym >= XK_F1) && (keysym <= XK_F12))
+                    {
+                        if(is_down)
+                        {
+                            new_input->FKeyPressed[keysym - XK_F1 + 1] = true;
+                        }
+                    }
                     break;
                 }
                 case ButtonPress:
@@ -2423,6 +2430,7 @@ main()
             next_controller_refresh = last_counter.tv_sec + 1;
         }
 
+        ZeroStruct(new_input->FKeyPressed);
         hhxcb_process_events(&context, state, &buffer, &RenderCommands,
                              &DrawRegion, new_input, old_input);
 
