@@ -1,0 +1,13 @@
+diff --git a/ray/ray.cpp b/ray/ray.cpp
+index c2f0cbd..716638d 100644
+--- a/ray/ray.cpp
++++ b/ray/ray.cpp
+@@ -461,6 +461,8 @@ int main(int ArgCount, char **Args)
+ 
+ #if RAY_WIN32
+ #include "win32_ray.cpp"
++#elif RAY_LINUX
++#include "linux_ray.cpp"
+ #else
+ #error "You need to define a platform!"
+ #endif

@@ -23,3 +23,9 @@
 /data/intro_art.hha
 /xcb_handmade.ctm
 /ctime/ctime.c
+/rayBuild
+/ray/ray.h
+/ray/ray.cpp
+/ray/ray_math.h
+/ray/ray.ctm
+/ray/data

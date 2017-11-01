@@ -9,7 +9,7 @@ Prerequisites
 
 Most importantly, you’ll need Handmade Hero source code for the
 platform-independent game code.  Pre-order the game and get the nightly source
-code.  This revision works with day 403 or later.
+code.  This revision works with day 406 or later.
 
 You will need g++ (tested with g++ 4.6) or other C++ compiler.
 
@@ -41,15 +41,6 @@ Casey's code. Some of these diff files are needed slightly before the day
 they are labeled with, if you find the code will still not compile, try one
 of the later files. You will only need to apply one of these diff files for
 any given day.
-
-CTime
------
-
-If you want to use Casey's ctime to measure your build times, you can use
-ctime/ctime.diff to patch Casey's ctime.c to make it compile on linux.
-Just change into Casey's ctime directory and run this command:
-
-     patch ctime.c path/to/xcb_handmade/ctime/ctime.diff
 
 Build process
 -------------
@@ -122,7 +113,6 @@ support truetype fonts, only bitmap fonts that seem to be integrated into
 xwindows. You can use the terminal command "xlsfonts" to get a list of the
 fonts xwindows has hidden away somewhere.
 
-
 IACA
 ----
 
@@ -141,6 +131,16 @@ To run IACA:
 
 after switching on IACA in handmade_render_group.cpp and compiling.
 
+CTime
+-----
+
+If you want to use Casey's ctime to measure your build times, you can use
+ctime/ctime.c.diff to patch Casey's ctime.c to make it compile on linux.
+Change into the xcb_handmade ctime directory and run these commands:
+
+     ln -s /path/to/casey's/ctime/directory/ctime.c .
+     patch ctime.c ctime.c.diff
+     ./build.sh
 
 Underflow/Overfow checking
 --------------------------
@@ -162,6 +162,18 @@ If the game still crashes, you may need to increase the value.
 See https://www.kernel.org/doc/Documentation/sysctl/vm.txt max_map_count
 section for more information.
 
+Handmade Ray
+------------
+
+If you want to use handmade ray, you can use ray/ray.cpp.diff to patch Casey's
+ray.cpp to make it compile on linux.
+Change into the xcb_handmade ray directory and run these commands:
+
+     ln -s /path/to/casey's/ray/directory/ray.cpp .
+     ln -s /path/to/casey's/ray/directory/ray.h .
+     ln -s /path/to/casey's/ray/directory/ray_math.h .
+     patch ray.cpp ray.cpp.diff
+     ./build.sh
 
 Implementation progress
 -----------------------
