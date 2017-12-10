@@ -27,5 +27,8 @@
 /ray/ray.h
 /ray/ray.cpp
 /ray/ray_math.h
+/ray/ray_lane.h
+/ray/ray_lane_4x.h
+/ray/ray_lane_8x.h
 /ray/ray.ctm
 /ray/data

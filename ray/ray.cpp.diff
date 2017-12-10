@@ -1,8 +1,34 @@
-diff --git a/ray/ray.cpp b/ray/ray.cpp
-index c2f0cbd..716638d 100644
---- a/ray/ray.cpp
-+++ b/ray/ray.cpp
-@@ -461,6 +461,8 @@ int main(int ArgCount, char **Args)
+--- ../handmade/ray/ray.cpp	2017-12-07 19:18:40.771446179 +1100
++++ ray/ray.cpp	2017-12-10 15:20:19.818973867 +1100
+@@ -426,7 +426,7 @@
+     
+     plane Planes[] =
+     {
+-        {{0, 0, 1}, {0}, 1},
++        {{0, 0, 1}, 0, 1},
+     };
+     
+     sphere Spheres[] =
+@@ -448,7 +448,7 @@
+     
+     image_u32 Image = AllocateImage(1280, 720);
+     
+-    u32 CoreCount = GetCPUCoreCount();
++    u32 CoreCount = 1; //GetCPUCoreCount();
+     u32 TileWidth = Image.Width / CoreCount;
+     u32 TileHeight = TileWidth;
+     // TODO(casey): It seems like prescribing the tile to be 64x64 was the sweet spot
+@@ -540,7 +540,8 @@
+     }
+     
+     clock_t EndClock = clock();
+-    clock_t TimeElapsed = EndClock - StartClock;
++    u32 clocksPerMS = CLOCKS_PER_SEC / 1000;
++    clock_t TimeElapsed = (EndClock - StartClock) / clocksPerMS;
+     
+     u64 UsedBounces = Queue.BouncesComputed;
+     u64 TotalBounces = Queue.LoopsComputed;
+@@ -562,6 +563,8 @@
  
  #if RAY_WIN32
  #include "win32_ray.cpp"

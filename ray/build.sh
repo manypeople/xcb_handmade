@@ -20,10 +20,10 @@ if [[ `basename $PWD` != "ray" ]]; then exit; fi
 
 ../build/opt/ctime -begin ray.ctm
 
-d="-g"
+d="-Og"
 o="-Ofast"
-CommonCompilerFlags="${o} -Wno-write-strings"
-CommonCompilerFlags="-DRAY_LINUX=1 ${CommonCompilerFlags}"
+CommonCompilerFlags="-mavx ${o} -Wno-write-strings"
+CommonCompilerFlags="-DCOMPILER_LLVM -DRAY_LINUX=1 ${CommonCompilerFlags}"
 CommonLinkerFlags="-lm"
 
 mkdir -p ../rayBuild
@@ -43,5 +43,5 @@ if ((${error}!=0)); then exit; fi
 mkdir -p data
 pushd data
 ../../rayBuild/ray
-eog test.bmp
+#eog test.bmp
 popd

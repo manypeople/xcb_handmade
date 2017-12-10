@@ -1,0 +1,95 @@
+--- ../handmade/ray/ray_lane_8x.h	2017-12-10 15:56:34.748772640 +1100
++++ ray/ray_lane_8x.h.bak	2017-12-10 15:54:52.737118830 +1100
+@@ -78,7 +78,7 @@
+     lane_u32 Result;
+     
+     // TODO(casey): What's the most efficient way to invert this comparison?
+-    Result.V = _mm256_xor_si256(_mm256_cmpeq_epi32(A.V, B.V), _mm256_set1_epi32(0xFFFFFFFF));
++    Result.V = _mm256_castps_si256(_mm256_xor_ps(_mm256_cmp_ps(_mm256_cvtepi32_ps(A.V), _mm256_cvtepi32_ps(B.V), _CMP_EQ_UQ), _mm256_castsi256_ps(_mm256_set1_epi32(0xFFFFFFFF))));
+     
+     return(Result);
+ }
+@@ -88,7 +88,7 @@
+ {
+     lane_u32 Result;
+     
+-    Result.V = _mm256_xor_si256(A.V, B.V);
++    Result.V = _mm256_castps_si256(_mm256_xor_ps(_mm256_castsi256_ps(A.V), _mm256_castsi256_ps(B.V)));
+     
+     return(Result);
+ }
+@@ -98,7 +98,7 @@
+ {
+     lane_u32 Result;
+     
+-    Result.V = _mm256_and_si256(A.V, B.V);
++    Result.V = _mm256_castps_si256(_mm256_and_ps(_mm256_castsi256_ps(A.V), _mm256_castsi256_ps(B.V)));
+     
+     return(Result);
+ }
+@@ -118,7 +118,7 @@
+ {
+     lane_u32 Result;
+     
+-    Result.V = _mm256_andnot_si256(A.V, B.V);
++    Result.V = _mm256_castps_si256(_mm256_andnot_ps(_mm256_castsi256_ps(A.V), _mm256_castsi256_ps(B.V)));
+     
+     return(Result);
+ }
+@@ -128,7 +128,7 @@
+ {
+     lane_u32 Result;
+     
+-    Result.V = _mm256_or_si256(A.V, B.V);
++    Result.V = _mm256_castps_si256(_mm256_or_ps(_mm256_castsi256_ps(A.V), _mm256_castsi256_ps(B.V)));
+     
+     return(Result);
+ }
+@@ -138,8 +138,13 @@
+ {
+     lane_u32 Result;
+     
+-    Result.V = _mm256_slli_epi32(A.V, Shift);
+-    
++    __m128i *inPtr = (__m128i *)&A.V;
++    __m128i firstHalf = _mm_slli_epi32(*inPtr, Shift);
++    __m128i secondHalf = _mm_slli_epi32(*(inPtr + 1), Shift);
++    __m128i *outPtr = (__m128i *)&Result.V;
++    *outPtr = firstHalf;
++    *(outPtr + 1) = secondHalf;
++        
+     return(Result);
+ }
+ 
+@@ -148,7 +153,12 @@
+ {
+     lane_u32 Result;
+     
+-    Result.V = _mm256_srli_epi32(A.V, Shift);
++    __m128i *inPtr = (__m128i *)&A.V;
++    __m128i firstHalf = _mm_srli_epi32(*inPtr, Shift);
++    __m128i secondHalf = _mm_srli_epi32(*(inPtr + 1), Shift);
++    __m128i *outPtr = (__m128i *)&Result.V;
++    *outPtr = firstHalf;
++    *(outPtr + 1) = secondHalf;
+     
+     return(Result);
+ }
+@@ -168,7 +178,7 @@
+ {
+     lane_u32 Result;
+     
+-    Result.V = _mm256_add_epi32(A.V, B.V);
++    Result.V = _mm256_cvttps_epi32(_mm256_add_ps(_mm256_cvtepi32_ps(A.V), _mm256_cvtepi32_ps(B.V)));
+     
+     return(Result);
+ }
+@@ -314,7 +324,7 @@
+ internal b32x
+ MaskIsZeroed(lane_u32 A)
+ {
+-    int Mask = _mm256_movemask_epi8(A.V);
++    int Mask = _mm256_movemask_ps(_mm256_cvtepi32_ps(A.V));
+     return(Mask == 0);
+ }
+ 

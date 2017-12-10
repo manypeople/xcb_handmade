@@ -1483,6 +1483,12 @@ hhxcbInitOpenGL(hhxcb_context *context)
                     
         At = End;
     }
+
+    // NOTE: intel ivy bridge hd4000 linux graphics driver has
+    // GLX_EXT_framebuffer_sRGB/GLX_ARB_framebuffer_sRGB, but has no
+    // srgb contexts ¯\_(ツ)_/¯
+    // So this is just a hack for that issue
+    OpenGL.SupportsSRGBFramebuffer = false;
     
 	s32 desiredVisualPixelFormat[] =
     {	
@@ -1491,6 +1497,11 @@ hhxcbInitOpenGL(hhxcb_context *context)
         GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB, GL_TRUE,
 		0
 	};
+
+    if(!OpenGL.SupportsSRGBFramebuffer)
+    {
+        desiredVisualPixelFormat[2] = 0;
+    }
 
 	s32 screen = DefaultScreen(context->display);
 	XVisualInfo *ChosenVisualInfo = glXChooseVisual(context->display,
@@ -1522,7 +1533,12 @@ hhxcbInitOpenGL(hhxcb_context *context)
                 GLX_FRAMEBUFFER_SRGB_CAPABLE_ARB, GL_TRUE,
                 0
             };
-
+            
+            if(!OpenGL.SupportsSRGBFramebuffer)
+            {
+                desiredFBConfigPixelFormat[4] = 0;
+            }
+    
             s32 numberOfConfigsReturned = 0;
             GLXFBConfig *FBConfig = glXChooseFBConfig(context->display,
                             DefaultScreen(context->display),
