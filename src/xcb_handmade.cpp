@@ -133,6 +133,7 @@ typedef void type_glEnableVertexAttribArray(GLuint index);
 typedef void type_glDisableVertexAttribArray(GLuint index);
 typedef GLint type_glGetAttribLocation(GLuint program, const GLchar *name);
 typedef void type_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
+typedef void type_glVertexAttribIPointer(GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer);
 typedef void type_glBindVertexArray(GLuint array);
 typedef void type_glGenVertexArrays(GLsizei n, GLuint *arrays);
 typedef void type_glBindBuffer (GLenum target, GLuint buffer);
@@ -182,6 +183,7 @@ OpenGLGlobalFunction(glEnableVertexAttribArray);
 OpenGLGlobalFunction(glDisableVertexAttribArray);
 OpenGLGlobalFunction(glGetAttribLocation);
 OpenGLGlobalFunction(glVertexAttribPointer);
+OpenGLGlobalFunction(glVertexAttribIPointer);
 OpenGLGlobalFunction(glDebugMessageControl);
 OpenGLGlobalFunction(glDebugMessageCallbackARB);
 OpenGLGlobalFunction(glBindVertexArray);
@@ -1574,6 +1576,7 @@ hhxcbInitOpenGL(hhxcb_context *context)
 		hhxcbGetOpenGLFunction(glDisableVertexAttribArray);
 		hhxcbGetOpenGLFunction(glGetAttribLocation);
 		hhxcbGetOpenGLFunction(glVertexAttribPointer);
+		hhxcbGetOpenGLFunction(glVertexAttribIPointer);
         hhxcbGetOpenGLFunction(glDebugMessageControl);
         hhxcbGetOpenGLFunction(glDebugMessageCallbackARB);
 		hhxcbGetOpenGLFunction(glBindVertexArray);
@@ -2248,14 +2251,14 @@ main()
 //#define START_WIDTH 480
 //#define START_HEIGHT 270
 
-#define START_WIDTH 960
-#define START_HEIGHT 540
+//#define START_WIDTH 960
+//#define START_HEIGHT 540
 
 //#define START_WIDTH 1280
 //#define START_HEIGHT 720
 
-//#define START_WIDTH 1920
-//#define START_HEIGHT 1080
+#define START_WIDTH 1920
+#define START_HEIGHT 1080
 
 //#define START_WIDTH 1279
 //#define START_HEIGHT 719

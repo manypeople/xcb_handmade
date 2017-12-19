@@ -1,11 +1,11 @@
 --- ../handmade/ray/ray_lane_8x.h	2017-12-10 15:56:34.748772640 +1100
-+++ ray/ray_lane_8x.h.bak	2017-12-10 15:54:52.737118830 +1100
++++ ray/ray_lane_8x.h	2017-12-13 00:38:07.126261853 +1100
 @@ -78,7 +78,7 @@
      lane_u32 Result;
      
      // TODO(casey): What's the most efficient way to invert this comparison?
 -    Result.V = _mm256_xor_si256(_mm256_cmpeq_epi32(A.V, B.V), _mm256_set1_epi32(0xFFFFFFFF));
-+    Result.V = _mm256_castps_si256(_mm256_xor_ps(_mm256_cmp_ps(_mm256_cvtepi32_ps(A.V), _mm256_cvtepi32_ps(B.V), _CMP_EQ_UQ), _mm256_castsi256_ps(_mm256_set1_epi32(0xFFFFFFFF))));
++    Result.V = _mm256_castps_si256(_mm256_cmp_ps(_mm256_cvtepi32_ps(A.V), _mm256_cvtepi32_ps(B.V), _CMP_NEQ_UQ));
      
      return(Result);
  }
