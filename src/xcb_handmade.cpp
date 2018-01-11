@@ -2350,12 +2350,25 @@ main()
 
     platform_memory_block *BitmapArrayBlock = hhxcbAllocateMemory(MaxVertexCount*sizeof(loaded_bitmap *), PlatformMemory_NotRestored);
     loaded_bitmap **BitmapArray = (loaded_bitmap **)BitmapArrayBlock->Base;
-
+    lighting_surface *Surfaces = (lighting_surface *)
+        hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(lighting_surface),
+                            PlatformMemory_NotRestored)->Base;
+    lighting_point *LightPoints = (lighting_point *)
+        hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(lighting_point),
+                            PlatformMemory_NotRestored)->Base;
+    v3 *EmitC0  = (v3 *)
+        hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(v3),
+                            PlatformMemory_NotRestored)->Base;
+            
+    
     game_render_commands RenderCommands = DefaultRenderCommands(
         PushBufferSize, PushBuffer,
         buffer.width, buffer.height,
         MaxVertexCount, VertexArray, BitmapArray,
-        &OpenGL.WhiteBitmap);
+        &OpenGL.WhiteBitmap,
+        Surfaces,
+        LightPoints,
+        EmitC0);
         
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
@@ -2736,6 +2749,8 @@ main()
 
         RenderCommands.PushBufferDataAt = RenderCommands.PushBufferBase;
         RenderCommands.VertexCount = 0;
+        RenderCommands.SurfaceCount = 0;
+        RenderCommands.LightPointCount = 0;
         
         game_input *temp_input = new_input;
         new_input = old_input;
