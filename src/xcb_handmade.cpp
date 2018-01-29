@@ -2350,8 +2350,8 @@ main()
 
     platform_memory_block *BitmapArrayBlock = hhxcbAllocateMemory(MaxVertexCount*sizeof(loaded_bitmap *), PlatformMemory_NotRestored);
     loaded_bitmap **BitmapArray = (loaded_bitmap **)BitmapArrayBlock->Base;
-    lighting_surface *Surfaces = (lighting_surface *)
-        hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(lighting_surface),
+    lighting_box *LightBoxes = (lighting_box *)
+        hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(lighting_box),
                             PlatformMemory_NotRestored)->Base;
     lighting_point *LightPoints = (lighting_point *)
         hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(lighting_point),
@@ -2366,7 +2366,7 @@ main()
         buffer.width, buffer.height,
         MaxVertexCount, VertexArray, BitmapArray,
         &OpenGL.WhiteBitmap,
-        Surfaces,
+        LightBoxes,
         LightPoints,
         EmitC0);
         
@@ -2749,7 +2749,7 @@ main()
 
         RenderCommands.PushBufferDataAt = RenderCommands.PushBufferBase;
         RenderCommands.VertexCount = 0;
-        RenderCommands.SurfaceCount = 0;
+        RenderCommands.LightBoxCount = 0;
         RenderCommands.LightPointCount = 0;
         
         game_input *temp_input = new_input;
