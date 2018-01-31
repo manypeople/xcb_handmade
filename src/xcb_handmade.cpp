@@ -91,6 +91,11 @@
 #include "xcb_handmade.h"
 #include "handmade_shared.h"
 
+// TODO(casey): Hopefully eventually we can get rid of these if we pull
+//the render code out into something more isolated.           
+#include "handmade_random.h"                               
+#include "handmade_lighting.h"
+
 platform_api Platform;
 
 global_variable hhxcb_state GlobalHhxcbState;
