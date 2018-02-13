@@ -2357,23 +2357,14 @@ main()
     loaded_bitmap **BitmapArray = (loaded_bitmap **)BitmapArrayBlock->Base;
     lighting_box *LightBoxes = (lighting_box *)
         hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(lighting_box),
-                            PlatformMemory_NotRestored)->Base;
-    lighting_point *LightPoints = (lighting_point *)
-        hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(lighting_point),
-                            PlatformMemory_NotRestored)->Base;
-    v3 *EmitC0  = (v3 *)
-        hhxcbAllocateMemory(LIGHT_DATA_WIDTH*sizeof(v3),
-                            PlatformMemory_NotRestored)->Base;
-            
+                            PlatformMemory_NotRestored)->Base;            
     
     game_render_commands RenderCommands = DefaultRenderCommands(
         PushBufferSize, PushBuffer,
         buffer.width, buffer.height,
         MaxVertexCount, VertexArray, BitmapArray,
         &OpenGL.WhiteBitmap,
-        LightBoxes,
-        LightPoints,
-        EmitC0);
+        LightBoxes);
         
     int16 *sample_buffer = (int16 *)calloc((sound_output.buffer_size_in_bytes), 1);
 
@@ -2500,6 +2491,8 @@ main()
 
 		BEGIN_BLOCK("GameUpdate");
 
+        RenderCommands.LightPointIndex = 1;
+        
         if(!GlobalPause)
         {
             if (state->recording_index)
@@ -2755,7 +2748,6 @@ main()
         RenderCommands.PushBufferDataAt = RenderCommands.PushBufferBase;
         RenderCommands.VertexCount = 0;
         RenderCommands.LightBoxCount = 0;
-        RenderCommands.LightPointCount = 0;
         
         game_input *temp_input = new_input;
         new_input = old_input;
